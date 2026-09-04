@@ -46,28 +46,22 @@
     </div>
 
     <div class="pointer-events-auto flex items-center gap-2">
-      <button onclick="exportFamilyJson()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs md:text-sm px-3 py-2 rounded-xl transition flex items-center gap-1 font-medium" title="Save file to device">
+      <button onclick="exportFamilyJson()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs md:text-sm px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 font-semibold" title="Save file to device">
         <span>📤</span> Export JSON
       </button>
 
-      <label class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs md:text-sm px-3 py-2 rounded-xl transition flex items-center gap-1 font-medium cursor-pointer" title="Load backup file">
+      <label class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs md:text-sm px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 font-semibold cursor-pointer" title="Load backup file">
         <span>📥</span> Import JSON
         <input type="file" accept=".json" onchange="importFamilyJson(event)" class="hidden">
       </label>
-
-      <button onclick="shareLinkToRelatives()" class="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg text-xs md:text-sm px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 font-semibold">
-        <span>🔗</span> Share Link
-      </button>
-
-      <button onclick="openAdminModal()" class="bg-amber-600 hover:bg-amber-700 text-white shadow-lg text-xs md:text-sm px-3 py-2 rounded-xl transition flex items-center gap-1.5 font-semibold">
-        <span>🔑</span> Admin
-      </button>
 
       <button onclick="toggleEventsPanel()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs md:text-sm px-3 py-2 rounded-xl transition flex items-center gap-1.5 font-medium">
         <span>🎉</span> Events
       </button>
 
       <button onclick="resetZoom()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs md:text-sm px-3 py-2 rounded-xl transition font-medium">Fit View</button>
+
+      <button onclick="clearStorageAndReset()" class="bg-rose-950/40 hover:bg-rose-900 border border-rose-800 text-rose-300 shadow-md text-xs px-2.5 py-2 rounded-xl transition font-medium">Reset</button>
     </div>
   </header>
 
@@ -78,64 +72,6 @@
       <button onclick="toggleEventsPanel()" class="text-slate-400 hover:text-white text-sm">✕</button>
     </div>
     <div id="eventsList" class="space-y-2 text-xs text-slate-300 max-h-80 overflow-y-auto"></div>
-  </div>
-
-  <!-- Admin Modal (Password: abc12345) -->
-  <div id="adminModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl max-w-md w-full p-6 relative">
-      <button onclick="closeModal('adminModal')" class="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
-      <div class="flex items-center gap-2 mb-1">
-        <span class="text-xl">🔑</span>
-        <h3 class="font-bold text-white text-base">Admin Dashboard</h3>
-      </div>
-      <p class="text-xs text-slate-400 mb-4">Central family database sync control.</p>
-
-      <!-- Password Screen -->
-      <div id="adminAuthBox" class="space-y-3">
-        <label class="block text-xs font-semibold text-slate-300">Enter Admin Password:</label>
-        <div class="flex gap-2">
-          <input id="adminPassInput" type="password" placeholder="Password" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-indigo-500">
-          <button onclick="verifyAdminPassword()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-1.5 rounded-lg">Login</button>
-        </div>
-        <p id="adminError" class="text-rose-400 text-xs hidden">Incorrect password. Please try again.</p>
-      </div>
-
-      <!-- Logged-in Controls -->
-      <div id="adminControlsBox" class="hidden space-y-4">
-        <div class="p-3.5 bg-slate-900/90 border border-slate-700 rounded-xl space-y-3">
-          <div class="flex justify-between items-center text-xs">
-            <span class="font-semibold text-slate-300">Cloud Sync Status:</span>
-            <span id="syncStatusBadge" class="text-emerald-400 font-mono font-bold">Connected</span>
-          </div>
-
-          <p class="text-[11px] text-slate-400">Fetch all changes made by relatives or push your current view as the master version.</p>
-
-          <div class="grid grid-cols-2 gap-2 pt-1">
-            <button onclick="pullLatestAdminData()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 rounded-lg transition shadow flex items-center justify-center gap-1">
-              <span>📥</span> Pull Latest Data
-            </button>
-            <button onclick="pushMasterAdminData()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 rounded-lg transition shadow flex items-center justify-center gap-1">
-              <span>📤</span> Push Master Data
-            </button>
-          </div>
-        </div>
-
-        <div class="p-3 bg-slate-900/60 border border-slate-700 rounded-xl space-y-2">
-          <h4 class="text-xs font-bold text-slate-200">Local File Backups</h4>
-          <div class="flex items-center gap-2">
-            <button onclick="exportFamilyJson()" class="w-1/2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold py-1.5 rounded-lg">Download File (.json)</button>
-            <label class="w-1/2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold py-1.5 rounded-lg text-center cursor-pointer">
-              Upload File (.json)
-              <input type="file" accept=".json" onchange="importFamilyJson(event)" class="hidden">
-            </label>
-          </div>
-        </div>
-
-        <div class="pt-2 border-t border-slate-700 flex justify-end">
-          <button onclick="clearStorageAndReset()" class="bg-rose-900/50 hover:bg-rose-900 text-rose-300 border border-rose-700 text-xs font-semibold px-3 py-1.5 rounded-lg">Reset Master Tree</button>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- SVG Canvas -->
@@ -225,7 +161,7 @@
 
         <div id="editAnniversaryGroup">
           <label class="block text-xs font-semibold text-slate-300 mb-1">Anniversary Date</label>
-          <input type="date" id="editAnniversary" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs focus:outline-indigo-500">
+          <input type="date" id="editAnniversary" class="w-full border border-slate-700 rounded-lg px-2 py-1.5 text-xs focus:outline-indigo-500 bg-slate-900">
         </div>
 
         <div class="flex justify-end gap-2 pt-3">
@@ -237,9 +173,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "dynamic_family_tree_matrix_v19";
-    const FOCUS_KEY = "dynamic_family_tree_focus_v19";
-    const SYNC_BLOB_ID = "1342603774844391424"; // Persistent central vault endpoint
+    const STORAGE_KEY = "dynamic_family_tree_matrix_v21";
+    const FOCUS_KEY = "dynamic_family_tree_focus_v21";
 
     const MALE_ICON = `<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>`;
     const FEMALE_ICON = `<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a4.5 4.5 0 0 0-4.5 4.5c0 1.9 1.2 3.5 2.8 4.2C7 11.5 4 14.2 4 18v2h16v-2c0-3.8-3-6.5-6.3-7.3 1.6-.7 2.8-2.3 2.8-4.2A4.5 4.5 0 0 0 12 2zm0 2c1.4 0 2.5 1.1 2.5 2.5S13.4 9 12 9s-2.5-1.1-2.5-2.5S10.6 4 12 4z"/><circle cx="12" cy="5.8" r="1.1" fill="#f43f5e"/></svg>`;
@@ -260,85 +195,11 @@
       return defaultFamily;
     }
 
-    function persistFamilyData(skipRemoteSync = false) {
+    function persistFamilyData() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(family));
       localStorage.setItem(FOCUS_KEY, focusPersonId);
-      if (!skipRemoteSync) {
-        pushRemoteData();
-      }
     }
 
-    // ==========================================
-    // CLOUD DATABASE SYNC ENGINE (jsonblob)
-    // ==========================================
-    async function pushRemoteData() {
-      try {
-        await fetch(`https://jsonblob.com/api/jsonBlob/${SYNC_BLOB_ID}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", "Accept": "application/json" },
-          body: JSON.stringify(family)
-        });
-      } catch (err) {
-        console.warn("Background cloud auto-push error:", err);
-      }
-    }
-
-    async function pullLatestAdminData() {
-      const badge = document.getElementById("syncStatusBadge");
-      if (badge) badge.innerText = "Pulling...";
-
-      try {
-        const res = await fetch(`https://jsonblob.com/api/jsonBlob/${SYNC_BLOB_ID}`, {
-          method: "GET",
-          headers: { "Accept": "application/json" },
-          cache: "no-store"
-        });
-
-        if (res.ok) {
-          const cloudData = await res.json();
-          if (Array.isArray(cloudData) && cloudData.length > 0) {
-            family = cloudData;
-            persistFamilyData(true);
-            renderTree();
-            updateHeaderInputs();
-            if (badge) badge.innerText = "Synced Just Now";
-            alert(`Success! Loaded ${family.length} members from the central database.`);
-            return;
-          }
-        }
-        throw new Error("Invalid response format");
-      } catch (err) {
-        if (badge) badge.innerText = "Error Connecting";
-        alert("Failed to pull latest data. Check internet connection or push your local version first.");
-      }
-    }
-
-    async function pushMasterAdminData() {
-      const badge = document.getElementById("syncStatusBadge");
-      if (badge) badge.innerText = "Pushing...";
-
-      try {
-        const res = await fetch(`https://jsonblob.com/api/jsonBlob/${SYNC_BLOB_ID}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", "Accept": "application/json" },
-          body: JSON.stringify(family)
-        });
-
-        if (res.ok) {
-          if (badge) badge.innerText = "Pushed Just Now";
-          alert(`Master family tree (${family.length} members) saved to cloud successfully! Relatives can now load it on their phones.`);
-        } else {
-          throw new Error("Upload rejected");
-        }
-      } catch (err) {
-        if (badge) badge.innerText = "Push Failed";
-        alert("Failed to push master data. Please check internet connection.");
-      }
-    }
-
-    // ==========================================
-    // IMPORT / EXPORT HANDLERS
-    // ==========================================
     function exportFamilyJson() {
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(family, null, 2));
       const downloadAnchor = document.createElement('a');
@@ -360,46 +221,20 @@
           if (Array.isArray(imported) && imported.length > 0) {
             family = imported;
             focusPersonId = family[0].id;
-            persistFamilyData(false); // Automatically sync to cloud too
+            persistFamilyData();
             renderTree();
             updateHeaderInputs();
-            alert(`Successfully loaded ${family.length} members from JSON file!`);
+            alert(`Successfully loaded ${family.length} members from file!`);
           } else {
-            alert("The uploaded JSON does not contain valid family members array.");
+            alert("The file does not contain a valid family members list.");
           }
         } catch (err) {
-          alert("Invalid JSON file format.");
+          alert("Invalid JSON file.");
         }
       };
       reader.readAsText(file);
     }
 
-    // Admin Controls
-    function openAdminModal() {
-      document.getElementById("adminModal").classList.remove("hidden");
-    }
-
-    function verifyAdminPassword() {
-      const entered = document.getElementById("adminPassInput").value.trim();
-      if (entered === "abc12345") {
-        document.getElementById("adminAuthBox").classList.add("hidden");
-        document.getElementById("adminControlsBox").classList.remove("hidden");
-        document.getElementById("adminError").classList.add("hidden");
-      } else {
-        document.getElementById("adminError").classList.remove("hidden");
-      }
-    }
-
-    function shareLinkToRelatives() {
-      const shareUrl = window.location.href.split("?")[0];
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        alert("Link copied to clipboard!\n\nSend this URL to your family. When relatives open it and add relatives, it automatically syncs straight into your master cloud storage.");
-      }).catch(() => {
-        prompt("Copy this link to send to relatives:", shareUrl);
-      });
-    }
-
-    // Kinship helpers
     const isOlder = (p1, p2) => {
       if (!p1 || !p2 || !p1.dob || !p2.dob) return false;
       return new Date(p1.dob) < new Date(p2.dob);
@@ -422,6 +257,7 @@
       return p1Parents.some(id => p2Parents.includes(id));
     };
 
+    // Atomic Kinship Rules
     function getDirectKinshipRole(pA, pB) {
       if (!pA || !pB || pA.id === pB.id) return null;
 
@@ -564,6 +400,7 @@
       return null;
     }
 
+    // Comprehensive Graph Kinship Resolver
     function computeKinship(targetId) {
       if (targetId === focusPersonId) return "You (నేను)";
 
@@ -571,9 +408,11 @@
       const target = family.find(m => m.id === targetId);
       if (!focus || !target) return "";
 
+      // Step 1: Direct Link
       const direct = getDirectKinshipRole(focus, target);
       if (direct) return renderKinshipString(direct.role, direct.isBio, focus, target);
 
+      // Step 2: Via Direct Spouse
       if (focus.spouseId) {
         const spouse = family.find(m => m.id === focus.spouseId);
         if (spouse) {
@@ -608,6 +447,48 @@
         }
       }
 
+      // Step 3: TWO-HOP BRIDGE VIA SIBLING'S SPOUSE (Ammulu -> Navya -> Arjun -> Target)
+      const mySiblings = family.filter(m => areSiblings(focus, m));
+      for (let sib of mySiblings) {
+        if (sib.spouseId) {
+          const sibSpouse = family.find(m => m.id === sib.spouseId);
+          if (sibSpouse) {
+            // Check direct to sibling's spouse (Arjun to Ammulu)
+            if (sibSpouse.id === target.id) {
+              return isOlder(sibSpouse, focus) ? "బావ (Bava)" : "మరిది (Maridi)";
+            }
+
+            // Check relation from Arjun to Target
+            const relFromArjun = getDirectKinshipRole(sibSpouse, target);
+            if (relFromArjun) {
+              const r = relFromArjun.role;
+              // Sister's husband's parents (Laxman & Kalavathi)
+              if (r === 'FATHER') return "మామగారు (Mamagaru) [వియ్యాలవారు]";
+              if (r === 'MOTHER') return "అత్తగారు (Attagaru) [వియ్యాలవారు]";
+              // Sister's husband's grandparents (Mallaiah, Lakshmi, Narasaiah, Ratnavva)
+              if (r === 'PATERNAL_GRANDFATHER' || r === 'MATERNAL_GRANDFATHER') return "తాతయ్య (Taatayya)";
+              if (r === 'PATERNAL_GRANDMOTHER') return "నానమ్మ (Nanamma)";
+              if (r === 'MATERNAL_GRANDMOTHER') return "అమ్మమ్మ (Ammamma)";
+              // Sister's husband's brothers (Arun, Aravind)
+              if (r === 'BROTHER') return isOlder(target, focus) ? "బావ (Bava)" : "మరిది (Maridi)";
+              if (r === 'SISTER') return isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
+              // Sister's husband's aunts & uncles
+              if (r === 'FATHER_BROTHER' || r === 'MOTHER_BROTHER') return "మామగారు / బాబాయ్";
+              if (r === 'FATHER_SISTER' || r === 'MOTHER_SISTER') return "అత్తగారు / పిన్ని";
+              // Sister's husband's cousins (Sagar, Harini, Manasa, Rachana)
+              if (r === 'CROSS_MALE_COUSIN') return isOlder(target, focus) ? "బావ (Bava)" : "మరిది (Maridi)";
+              if (r === 'CROSS_FEMALE_COUSIN') return isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
+            }
+
+            // Grandchildren of Arjun & Navya (Veda, Jr Veda)
+            if (getAllParents(target).some(p => p.id === sib.id || p.id === sibSpouse.id)) {
+              return target.gender === 'male' ? "మేనల్లుడు (Menalludu)" : "మేనకోడలు (Menakodalu)";
+            }
+          }
+        }
+      }
+
+      // Step 4: Generation propagation (Children / Grandchildren)
       for (let p of getAllParents(target)) {
         const pRel = getDirectKinshipRole(focus, p) || (focus.spouseId ? getDirectKinshipRole(family.find(m => m.id === focus.spouseId), p) : null);
         if (pRel) {
@@ -620,6 +501,7 @@
         }
       }
 
+      // Step 5: Spouses of relatives
       if (target.spouseId) {
         const tSpouse = family.find(m => m.id === target.spouseId);
         if (tSpouse) {
@@ -634,6 +516,7 @@
         }
       }
 
+      // Step 6: In-law extensions
       const focusChildren = family.filter(m => getAllParents(m).some(p => p.id === focus.id || (focus.spouseId && p.id === focus.spouseId)));
       for (let ch of focusChildren) {
         if (ch.spouseId) {
@@ -655,18 +538,6 @@
               if (getAllParents(target).some(p => p.id === ss.id || (ss.spouseId && p.id === ss.spouseId))) {
                 return target.gender === 'male' ? "మనవడు (Manavadu)" : "మనవరాలు (Manavaralu)";
               }
-            }
-          }
-        }
-      }
-
-      if (focus.gender === 'female') {
-        const daughters = family.filter(m => getAllParents(m).some(p => p.id === focus.id));
-        for (let d of daughters) {
-          if (d.spouseId) {
-            const h = family.find(m => m.id === d.spouseId);
-            if (h && getAllParents(h).some(p => p.id === target.id)) {
-              return target.gender === 'male' ? "వియ్యంకుడు (Viyyankudu)" : "వియ్యపురాలు (Viyyaralu)";
             }
           }
         }
@@ -770,7 +641,7 @@
     }
 
     function clearStorageAndReset() {
-      if (confirm("Reset tree to default? This will clear local and remote records.")) {
+      if (confirm("Reset tree to default? This will clear local records on this device.")) {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(FOCUS_KEY);
         family = defaultFamily;
@@ -779,7 +650,6 @@
         renderTree();
         updateHeaderInputs();
         resetZoom();
-        closeModal("adminModal");
       }
     }
 
@@ -980,7 +850,9 @@
 
           return `
             <div class="bg-slate-800 border ${isMainActive ? 'border-amber-400 ring-2 ring-amber-400/50 shadow-2xl' : 'border-slate-700 shadow-xl'} rounded-2xl transition p-3.5 flex flex-col justify-between h-full">
+              <!-- Top Row: Members -->
               <div class="flex items-start justify-between gap-2">
+                <!-- Primary Member -->
                 <div class="flex items-start gap-2.5 p-1.5 rounded-xl transition ${!isSpouseActive ? 'bg-slate-700/80 ring-1 ring-indigo-400 shadow-sm' : 'opacity-70 hover:opacity-100 hover:bg-slate-700/40'}" onclick="setFocusPerson('${m.id}')">
                   <div class="w-8 h-8 rounded-full ${m.gender === 'female' ? 'bg-rose-600' : 'bg-indigo-600'} flex items-center justify-center shrink-0 mt-0.5 shadow-md">
                     ${m.gender === 'female' ? FEMALE_ICON : MALE_ICON}
@@ -996,6 +868,7 @@
                   </div>
                 </div>
 
+                <!-- Spouse Member -->
                 ${spouse ? `
                   <div class="flex items-start gap-2.5 p-1.5 rounded-xl transition border-l pl-2 border-slate-700 ${isSpouseActive ? 'bg-slate-700/80 ring-1 ring-rose-400 shadow-sm' : 'opacity-70 hover:opacity-100 hover:bg-slate-700/40'}" onclick="event.stopPropagation(); setFocusPerson('${spouse.id}')">
                     <div class="text-right">
@@ -1014,11 +887,13 @@
                 ` : ''}
               </div>
 
+              <!-- Context Bar -->
               <div class="flex justify-between items-center px-2 text-[9px] text-slate-300 bg-slate-900/80 py-1 rounded-md border border-slate-700/80">
                 <span>Actions for: <strong class="text-indigo-300 font-bold">${activePerson.name}</strong></span>
                 <span class="text-[8px] text-slate-400 font-normal">(Click spouse above to switch)</span>
               </div>
 
+              <!-- Row 1 Actions -->
               <div class="grid grid-cols-4 gap-1.5 pt-0.5 text-[9px] font-bold">
                 <button onclick="openAddModal('${activePersonId}', 'father')" class="bg-slate-700 hover:bg-indigo-600 text-slate-200 hover:text-white py-1 rounded-md border border-slate-600 shadow-sm transition text-center ${hasFather ? 'opacity-30 pointer-events-none' : ''}">+ Nanna</button>
                 <button onclick="openAddModal('${activePersonId}', 'mother')" class="bg-slate-700 hover:bg-rose-600 text-slate-200 hover:text-white py-1 rounded-md border border-slate-600 shadow-sm transition text-center ${hasMother ? 'opacity-30 pointer-events-none' : ''}">+ Amma</button>
@@ -1026,6 +901,7 @@
                 <button onclick="openAddModal('${activePersonId}', 'child')" class="bg-slate-700 hover:bg-emerald-600 text-slate-200 hover:text-white py-1 rounded-md border border-slate-600 shadow-sm transition text-center ${isChild ? 'col-span-2' : ''}">+ Child</button>
               </div>
 
+              <!-- Row 2 Actions -->
               <div class="grid grid-cols-2 gap-1.5 text-[9px] font-bold">
                 <button onclick="openAddModal('${activePersonId}', 'brother')" class="bg-slate-700 hover:bg-indigo-600 text-slate-200 hover:text-white py-1 rounded-md border border-slate-600 shadow-sm transition text-center flex items-center justify-center gap-1">
                   <span>+ Brother</span> <span class="text-[8px] opacity-75 font-normal">(అన్న/తమ్ముడు)</span>
@@ -1241,8 +1117,6 @@
       updateHeaderInputs();
       resetZoom();
       renderTree();
-      // Silently sync from cloud upon startup
-      pullLatestAdminData().catch(() => {});
     };
   </script>
 </body>
