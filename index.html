@@ -142,7 +142,7 @@
 
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-1">Gender *</label>
-          <select id="editGender" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-indigo-500">
+          <select id="editGender" class="w-full border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-indigo-500 bg-slate-900">
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
@@ -173,8 +173,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "dynamic_family_tree_matrix_v25";
-    const FOCUS_KEY = "dynamic_family_tree_focus_v25";
+    const STORAGE_KEY = "dynamic_family_tree_matrix_v26";
+    const FOCUS_KEY = "dynamic_family_tree_focus_v26";
 
     const MALE_ICON = `<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>`;
     const FEMALE_ICON = `<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a4.5 4.5 0 0 0-4.5 4.5c0 1.9 1.2 3.5 2.8 4.2C7 11.5 4 14.2 4 18v2h16v-2c0-3.8-3-6.5-6.3-7.3 1.6-.7 2.8-2.3 2.8-4.2A4.5 4.5 0 0 0 12 2zm0 2c1.4 0 2.5 1.1 2.5 2.5S13.4 9 12 9s-2.5-1.1-2.5-2.5S10.6 4 12 4z"/><circle cx="12" cy="5.8" r="1.1" fill="#f43f5e"/></svg>`;
@@ -423,7 +423,7 @@
       const direct = getDirectKinshipRole(focus, target);
       if (direct) return renderKinshipString(direct.role, direct.isBio, focus, target);
 
-      // Tier 3A: Via Own Spouse (Navya viewing Arjun's side)
+      // Tier 3A: Via Own Spouse (Navya viewing Arjun's relatives)
       if (focus.spouseId) {
         const spouse = family.find(m => m.id === focus.spouseId);
         if (spouse) {
@@ -563,27 +563,67 @@
         }
       }
 
-      // Tier 6: Structural Merging of Daughter-in-law & Son-in-law Siblings (Ratnavva & Narasaiah logic)
+      // Tier 6: COUPLE-ALIGNED EXTENSIONS FOR IN-LAWS (Ratnavva & Narasaiah logic)
       const focusChildren = family.filter(m => getAllParents(m).some(p => p.id === focus.id || (focus.spouseId && p.id === focus.spouseId)));
       for (let ch of focusChildren) {
         if (ch.spouseId) {
-          const chSpouse = family.find(m => m.id === ch.spouseId);
+          const chSpouse = family.find(m => m.id === ch.spouseId); // e.g. Kalavathi
           if (chSpouse) {
+            // Parents of son's wife (Mallaiah & Lakshmi)
             if (getAllParents(chSpouse).some(p => p.id === target.id)) {
               return target.gender === 'male' ? "వియ్యంకుడు (Viyyankudu)" : "వియ్యపురాలు (Viyyaralu)";
             }
-            if (areSiblings(chSpouse, target)) {
-              return target.gender === 'female' ? "కోడలు (Kodalu)" : "అల్లుడు (Alludu)";
+
+            // A: Sisters of Kalavathi (Malliswari, Geetha) -> Kodalu
+            if (areSiblings(chSpouse, target) && target.gender === 'female') {
+              return "కోడలు (Kodalu)";
             }
-            const spouseSibs = family.filter(m => areSiblings(chSpouse, m));
-            for (let ss of spouseSibs) {
-              if (ss.spouseId === target.id) {
-                return target.gender === 'female' ? "కోడలు (Kodalu)" : "అల్లుడు (Alludu)";
+            // B: Husbands of Kalavathi's sisters (Srinivas, Raju) -> Koduku! (Preserves couple pairing!)
+            const spouseSisters = family.filter(m => areSiblings(chSpouse, m) && m.gender === 'female');
+            if (spouseSisters.some(s => s.spouseId === target.id)) {
+              return "కొడుకు (Koduku)";
+            }
+
+            // C: Brother of Kalavathi (Ashok) -> Alludu
+            if (areSiblings(chSpouse, target) && target.gender === 'male') {
+              return "అల్లుడు (Alludu)";
+            }
+            // D: Wife of Kalavathi's brother (Vasantha) -> Kooturu! (Preserves couple pairing!)
+            const spouseBrothers = family.filter(m => areSiblings(chSpouse, m) && m.gender === 'male');
+            if (spouseBrothers.some(b => b.spouseId === target.id)) {
+              return "కూతురు (Kooturu)";
+            }
+
+            // E: Children of Kalavathi's sisters (Harini) -> Manavadu / Manavaralu
+            for (let s of spouseSisters) {
+              if (getAllParents(target).some(p => p.id === s.id || (s.spouseId && p.id === s.spouseId))) {
+                return target.gender === 'male' ? "మనవడు (Manavadu)" : "మనవరాలు (Manavaralu)";
               }
             }
-            for (let ss of spouseSibs) {
-              if (getAllParents(target).some(p => p.id === ss.id || (ss.spouseId && p.id === ss.spouseId))) {
+
+            // F: Children of Kalavathi's brother (Sagar, Manasa, Rachana) -> Manavadu / Manavaralu
+            for (let b of spouseBrothers) {
+              if (getAllParents(target).some(p => p.id === b.id || (b.spouseId && p.id === b.spouseId))) {
                 return target.gender === 'male' ? "మనవడు (Manavadu)" : "మనవరాలు (Manavaralu)";
+              }
+            }
+
+            // G: Grandchild's in-laws (Ammulu & her parents)
+            const grandChildren = family.filter(m => getAllParents(m).some(p => p.id === ch.id || p.id === chSpouse.id));
+            for (let gc of grandChildren) {
+              if (gc.spouseId) {
+                const gcSpouse = family.find(m => m.id === gc.spouseId); // Navya
+                if (gcSpouse) {
+                  if (gcSpouse.id === target.id) {
+                    return target.gender === 'male' ? "మనమఅల్లుడు (Manama'alludu)" : "మనమకోడలు (Manamakodalu)";
+                  }
+                  if (areSiblings(gcSpouse, target)) {
+                    return target.gender === 'male' ? "మనమఅల్లుడు (Manama'alludu)" : "మనమకోడలు (Manamakodalu)";
+                  }
+                  if (getAllParents(gcSpouse).some(p => p.id === target.id)) {
+                    return target.gender === 'male' ? "వియ్యంకుడు (Viyyankudu)" : "వియ్యపురాలు (Viyyaralu)";
+                  }
+                }
               }
             }
           }
