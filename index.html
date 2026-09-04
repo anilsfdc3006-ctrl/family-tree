@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Dynamic Telugu Family Tree</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -10,7 +10,6 @@
     body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     .node-card { cursor: pointer; }
     .link-line { fill: none; stroke: #475569; stroke-width: 2.5px; }
-    
     #treeCanvas {
       background-color: #0f172a;
       background-image: radial-gradient(#334155 1.5px, transparent 1.5px);
@@ -21,57 +20,52 @@
 <body class="bg-slate-900 text-slate-100 relative">
 
   <!-- Header Controls -->
-  <header class="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
-    
-    <div class="pointer-events-auto flex items-center gap-3 bg-slate-800/95 backdrop-blur border border-slate-700 shadow-xl rounded-xl p-2 px-4">
-      <span class="text-2xl">🌳</span>
-      <div class="flex items-center gap-2 border-r border-slate-700 pr-3">
+  <header class="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+    <div class="pointer-events-auto flex items-center gap-2.5 bg-slate-800/95 backdrop-blur border border-slate-700 shadow-xl rounded-xl p-2 px-3">
+      <span class="text-xl">🌳</span>
+      <div class="flex items-center gap-1.5 border-r border-slate-700 pr-2.5">
         <div>
-          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Main Family Head</label>
-          <div class="flex items-center gap-1.5 mt-0.5">
-            <input id="mainPersonInput" type="text" placeholder="Enter root name..." class="border border-slate-600 rounded-lg px-2.5 py-1 text-xs text-white font-semibold focus:outline-indigo-500 w-32 bg-slate-900">
-            <button onclick="saveMainPersonName()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-2.5 py-1 rounded-lg transition shadow-sm">Save</button>
+          <label class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Family Head</label>
+          <div class="flex items-center gap-1 mt-0.5">
+            <input id="mainPersonInput" type="text" placeholder="Root name..." class="border border-slate-600 rounded px-2 py-0.5 text-xs text-white font-semibold focus:outline-indigo-500 w-24 bg-slate-900">
+            <button onclick="saveMainPersonName()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[10px] px-2 py-1 rounded transition">Save</button>
           </div>
         </div>
       </div>
       <div>
-        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Viewing Relations As</p>
-        <p class="text-xs text-indigo-400 font-extrabold" id="focusStatus">Loading...</p>
+        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Viewing As</p>
+        <p class="text-xs text-indigo-400 font-extrabold" id="focusStatus">arjun</p>
       </div>
     </div>
 
-    <div class="pointer-events-auto flex items-center bg-slate-800/95 backdrop-blur border border-slate-700 shadow-xl rounded-xl px-3 py-2 w-52 md:w-64">
-      <span class="text-slate-400 mr-2 text-sm">🔍</span>
-      <input id="searchInput" type="text" placeholder="Search relative..." class="w-full bg-transparent text-xs md:text-sm focus:outline-none text-white placeholder-slate-400" oninput="handleSearch(this.value)">
+    <div class="pointer-events-auto flex items-center bg-slate-800/95 backdrop-blur border border-slate-700 shadow-xl rounded-xl px-2.5 py-1.5 w-44 md:w-56">
+      <span class="text-slate-400 mr-1.5 text-xs">🔍</span>
+      <input id="searchInput" type="text" placeholder="Search relative..." class="w-full bg-transparent text-xs focus:outline-none text-white placeholder-slate-400" oninput="handleSearch(this.value)">
     </div>
 
-    <div class="pointer-events-auto flex items-center gap-2">
-      <button onclick="exportFamilyJson()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs md:text-sm px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 font-semibold" title="Save backup JSON to device">
-        <span>📤</span> Export JSON
+    <div class="pointer-events-auto flex items-center gap-1.5">
+      <button onclick="exportFamilyJson()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 font-medium" title="Save backup">
+        <span>📤</span> Export
       </button>
-
-      <label class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs md:text-sm px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 font-semibold cursor-pointer" title="Load backup JSON file">
-        <span>📥</span> Import JSON
+      <label class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 font-medium cursor-pointer" title="Load backup">
+        <span>📥</span> Import
         <input type="file" accept=".json" onchange="importFamilyJson(event)" class="hidden">
       </label>
-
-      <button onclick="toggleEventsPanel()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs md:text-sm px-3 py-2 rounded-xl transition flex items-center gap-1.5 font-medium">
+      <button onclick="toggleEventsPanel()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 font-medium">
         <span>🎉</span> Events
       </button>
-
-      <button onclick="resetZoom()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs md:text-sm px-3 py-2 rounded-xl transition font-medium">Fit View</button>
-
-      <button onclick="clearStorageAndReset()" class="bg-rose-950/40 hover:bg-rose-900 border border-rose-800 text-rose-300 shadow-md text-xs px-2.5 py-2 rounded-xl transition font-medium">Reset</button>
+      <button onclick="resetZoom()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs px-2.5 py-1.5 rounded-xl transition font-medium">Fit View</button>
+      <button onclick="clearStorageAndReset()" class="bg-rose-950/40 hover:bg-rose-900 border border-rose-800 text-rose-300 shadow-md text-xs px-2 py-1.5 rounded-xl transition font-medium">Reset</button>
     </div>
   </header>
 
   <!-- Side Events Drawer -->
-  <div id="eventsDrawer" class="hidden absolute top-20 right-4 z-20 w-80 bg-slate-800 border border-slate-700 shadow-2xl rounded-2xl p-4 transition-all">
-    <div class="flex justify-between items-center mb-3">
-      <h2 class="font-bold text-white text-sm">Upcoming Milestones (30 Days)</h2>
-      <button onclick="toggleEventsPanel()" class="text-slate-400 hover:text-white text-sm">✕</button>
+  <div id="eventsDrawer" class="hidden absolute top-16 right-3 z-20 w-72 bg-slate-800 border border-slate-700 shadow-2xl rounded-2xl p-4 transition-all">
+    <div class="flex justify-between items-center mb-2.5">
+      <h2 class="font-bold text-white text-xs">Upcoming Milestones (30 Days)</h2>
+      <button onclick="toggleEventsPanel()" class="text-slate-400 hover:text-white text-xs">✕</button>
     </div>
-    <div id="eventsList" class="space-y-2 text-xs text-slate-300 max-h-80 overflow-y-auto"></div>
+    <div id="eventsList" class="space-y-1.5 text-xs text-slate-300 max-h-80 overflow-y-auto"></div>
   </div>
 
   <!-- SVG Canvas -->
@@ -114,7 +108,7 @@
 
         <div id="anniversaryGroup" class="hidden">
           <label class="block text-xs font-semibold text-slate-300 mb-1">Anniversary Date</label>
-          <input type="date" id="formAnniversary" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs focus:outline-indigo-500">
+          <input type="date" id="formAnniversary" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-indigo-500">
         </div>
 
         <div class="flex justify-end gap-2 pt-3">
@@ -142,7 +136,7 @@
 
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-1">Gender *</label>
-          <select id="editGender" class="w-full border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-indigo-500 bg-slate-900">
+          <select id="editGender" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-indigo-500 bg-slate-900">
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
@@ -173,49 +167,64 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "dynamic_family_tree_matrix_v28";
-    const FOCUS_KEY = "dynamic_family_tree_focus_v28";
+    // New storage keys to force clear cached empty state on phones
+    const STORAGE_KEY = "telugu_family_tree_data_v30";
+    const FOCUS_KEY = "telugu_family_tree_focus_v30";
 
     const MALE_ICON = `<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>`;
     const FEMALE_ICON = `<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a4.5 4.5 0 0 0-4.5 4.5c0 1.9 1.2 3.5 2.8 4.2C7 11.5 4 14.2 4 18v2h16v-2c0-3.8-3-6.5-6.3-7.3 1.6-.7 2.8-2.3 2.8-4.2A4.5 4.5 0 0 0 12 2zm0 2c1.4 0 2.5 1.1 2.5 2.5S13.4 9 12 9s-2.5-1.1-2.5-2.5S10.6 4 12 4z"/><circle cx="12" cy="5.8" r="1.1" fill="#f43f5e"/></svg>`;
 
-const defaultFamily = [
-  { "id": "1", "name": "laxman", "gender": "male", "dob": "1962-01-01", "spouseId": "2", "anniversary": "1985-05-18", "parentIds": ["1788499824606", "1788499832236"] },
-  { "id": "2", "name": "kalavathi", "gender": "female", "dob": "1970-01-01", "spouseId": "1", "anniversary": "1985-05-18", "parentIds": ["1788499796499"] },
-  { "id": "1788499738062", "name": "arjun", "gender": "male", "dob": "1986-01-01", "spouseId": "1788499767902", "anniversary": null, "parentIds": ["1", "2"] },
-  { "id": "1788499744418", "name": "arun", "gender": "male", "dob": "1994-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1", "2"] },
-  { "id": "1788499753179", "name": "aravind", "gender": "male", "dob": "1996-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1", "2"] },
-  { "id": "1788499767902", "name": "navya", "gender": "female", "dob": "1994-01-01", "spouseId": "1788499738062", "anniversary": null, "parentIds": ["1788530252033"] },
-  { "id": "1788499776564", "name": "veda", "gender": "female", "dob": "2018-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788499738062", "1788499767902"] },
-  { "id": "1788499784981", "name": "jr veda", "gender": "female", "dob": "2026-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788499738062", "1788499767902"] },
-  { "id": "1788499796499", "name": "lakshmi", "gender": "female", "dob": null, "spouseId": "1788503137601", "anniversary": null, "parentIds": [] },
-  { "id": "1788499824606", "name": "Narasaiah", "gender": "male", "dob": null, "spouseId": "1788499832236", "anniversary": null, "parentIds": [] },
-  { "id": "1788499832236", "name": "Ratnavva", "gender": "female", "dob": null, "spouseId": "1788499824606", "anniversary": null, "parentIds": [] },
-  { "id": "1788499964158", "name": "malliswari", "gender": "female", "dob": "1976-01-01", "spouseId": "1788500027227", "anniversary": null, "parentIds": ["1788499796499"] },
-  { "id": "1788500027227", "name": "Srinivas", "gender": "male", "dob": "1972-01-01", "spouseId": "1788499964158", "anniversary": null, "parentIds": [] },
-  { "id": "1788501001590", "name": "Geetha", "gender": "female", "dob": "1981-01-01", "spouseId": "1788501015143", "anniversary": null, "parentIds": ["1788499796499"] },
-  { "id": "1788501015143", "name": "Raju", "gender": "male", "dob": "1977-01-01", "spouseId": "1788501001590", "anniversary": null, "parentIds": [] },
-  { "id": "1788501031856", "name": "Harini", "gender": "female", "dob": "2016-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788501015143", "1788501001590"] },
-  { "id": "1788501127880", "name": "Ashok", "gender": "male", "dob": null, "spouseId": "1788501143419", "anniversary": null, "parentIds": ["1788499796499"] },
-  { "id": "1788501143419", "name": "Vasantha", "gender": "female", "dob": "1977-01-01", "spouseId": "1788501127880", "anniversary": null, "parentIds": [] },
-  { "id": "1788501162260", "name": "Sagar", "gender": "male", "dob": "1992-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788501127880", "1788501143419"] },
-  { "id": "1788501182997", "name": "Manasa", "gender": "female", "dob": "1994-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788501127880", "1788501143419"] },
-  { "id": "1788501209163", "name": "Rachana", "gender": "female", "dob": "1998-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788501127880", "1788501143419"] },
-  { "id": "1788503137601", "name": "mallaiah", "gender": "male", "dob": null, "spouseId": "1788499796499", "anniversary": null, "parentIds": [] },
-  { "id": "1788530252033", "name": "Bhumeshwar", "gender": "male", "dob": "1970-01-01", "spouseId": "1788530281445", "anniversary": null, "parentIds": [] },
-  { "id": "1788530252133", "name": "ammulu", "gender": "female", "dob": "2003-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788530252033"] },
-  { "id": "1788530281445", "name": "laxmi", "gender": "female", "dob": "1977-01-01", "spouseId": "1788530252033", "anniversary": null, "parentIds": [] }
-];
+    // Embedded 25 Family Members
+    const defaultFamily = [
+      { "id": "1", "name": "laxman", "gender": "male", "dob": "1962-01-01", "spouseId": "2", "anniversary": "1985-05-18", "parentIds": ["1788499824606", "1788499832236"] },
+      { "id": "2", "name": "kalavathi", "gender": "female", "dob": "1970-01-01", "spouseId": "1", "anniversary": "1985-05-18", "parentIds": ["1788499796499"] },
+      { "id": "1788499738062", "name": "arjun", "gender": "male", "dob": "1986-01-01", "spouseId": "1788499767902", "anniversary": null, "parentIds": ["1", "2"] },
+      { "id": "1788499744418", "name": "arun", "gender": "male", "dob": "1994-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1", "2"] },
+      { "id": "1788499753179", "name": "aravind", "gender": "male", "dob": "1996-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1", "2"] },
+      { "id": "1788499767902", "name": "navya", "gender": "female", "dob": "1994-01-01", "spouseId": "1788499738062", "anniversary": null, "parentIds": ["1788530252033"] },
+      { "id": "1788499776564", "name": "veda", "gender": "female", "dob": "2018-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788499738062", "1788499767902"] },
+      { "id": "1788499784981", "name": "jr veda", "gender": "female", "dob": "2026-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788499738062", "1788499767902"] },
+      { "id": "1788499796499", "name": "lakshmi", "gender": "female", "dob": null, "spouseId": "1788503137601", "anniversary": null, "parentIds": [] },
+      { "id": "1788499824606", "name": "Narasaiah", "gender": "male", "dob": null, "spouseId": "1788499832236", "anniversary": null, "parentIds": [] },
+      { "id": "1788499832236", "name": "Ratnavva", "gender": "female", "dob": null, "spouseId": "1788499824606", "anniversary": null, "parentIds": [] },
+      { "id": "1788499964158", "name": "malliswari", "gender": "female", "dob": "1976-01-01", "spouseId": "1788500027227", "anniversary": null, "parentIds": ["1788499796499"] },
+      { "id": "1788500027227", "name": "Srinivas", "gender": "male", "dob": "1972-01-01", "spouseId": "1788499964158", "anniversary": null, "parentIds": [] },
+      { "id": "1788501001590", "name": "Geetha", "gender": "female", "dob": "1981-01-01", "spouseId": "1788501015143", "anniversary": null, "parentIds": ["1788499796499"] },
+      { "id": "1788501015143", "name": "Raju", "gender": "male", "dob": "1977-01-01", "spouseId": "1788501001590", "anniversary": null, "parentIds": [] },
+      { "id": "1788501031856", "name": "Harini", "gender": "female", "dob": "2016-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788501015143", "1788501001590"] },
+      { "id": "1788501127880", "name": "Ashok", "gender": "male", "dob": null, "spouseId": "1788501143419", "anniversary": null, "parentIds": ["1788499796499"] },
+      { "id": "1788501143419", "name": "Vasantha", "gender": "female", "dob": "1977-01-01", "spouseId": "1788501127880", "anniversary": null, "parentIds": [] },
+      { "id": "1788501162260", "name": "Sagar", "gender": "male", "dob": "1992-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788501127880", "1788501143419"] },
+      { "id": "1788501182997", "name": "Manasa", "gender": "female", "dob": "1994-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788501127880", "1788501143419"] },
+      { "id": "1788501209163", "name": "Rachana", "gender": "female", "dob": "1998-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788501127880", "1788501143419"] },
+      { "id": "1788503137601", "name": "mallaiah", "gender": "male", "dob": null, "spouseId": "1788499796499", "anniversary": null, "parentIds": [] },
+      { "id": "1788530252033", "name": "Bhumeshwar", "gender": "male", "dob": "1970-01-01", "spouseId": "1788530281445", "anniversary": null, "parentIds": [] },
+      { "id": "1788530252133", "name": "ammulu", "gender": "female", "dob": "2003-01-01", "spouseId": null, "anniversary": null, "parentIds": ["1788530252033"] },
+      { "id": "1788530281445", "name": "laxmi", "gender": "female", "dob": "1977-01-01", "spouseId": "1788530252033", "anniversary": null, "parentIds": [] }
+    ];
 
     let family = loadInitialFamily();
-    let focusPersonId = localStorage.getItem(FOCUS_KEY) || family[0]?.id || "1";
+    let focusPersonId = loadInitialFocus();
 
     function loadInitialFamily() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
       }
       return defaultFamily;
+    }
+
+    function loadInitialFocus() {
+      const saved = localStorage.getItem(FOCUS_KEY);
+      if (saved && family.some(m => m.id === saved)) return saved;
+      // Default to Arjun
+      const arjun = family.find(m => m.name.toLowerCase() === "arjun");
+      return arjun ? arjun.id : (family[0]?.id || "1788499738062");
     }
 
     function persistFamilyData() {
@@ -248,8 +257,6 @@ const defaultFamily = [
             renderTree();
             updateHeaderInputs();
             alert(`Loaded ${family.length} relatives successfully!`);
-          } else {
-            alert("The uploaded file does not contain a valid family members list.");
           }
         } catch (err) {
           alert("Invalid JSON file.");
@@ -280,10 +287,8 @@ const defaultFamily = [
       return p1Parents.some(id => p2Parents.includes(id));
     };
 
-    // Level 1: Direct & Nuclear Kinship
     function getDirectKinshipRole(pA, pB) {
       if (!pA || !pB || pA.id === pB.id) return null;
-
       if (pA.spouseId === pB.id) return { role: 'SPOUSE', isBio: true };
 
       const aParents = getAllParents(pA);
@@ -292,11 +297,9 @@ const defaultFamily = [
       if (aParents.some(p => p.id === pB.id)) {
         return { role: pB.gender === 'male' ? 'FATHER' : 'MOTHER', isBio: true };
       }
-
       if (bParents.some(p => p.id === pA.id || (pA.spouseId && p.id === pA.spouseId))) {
         return { role: pB.gender === 'male' ? 'SON' : 'DAUGHTER', isBio: (pB.parentIds || []).includes(pA.id) };
       }
-
       if (areSiblings(pA, pB)) {
         return { role: pB.gender === 'male' ? 'BROTHER' : 'SISTER', isBio: true };
       }
@@ -311,23 +314,13 @@ const defaultFamily = [
         return { role: pB.gender === 'male' ? 'MATERNAL_GRANDFATHER' : 'MATERNAL_GRANDMOTHER', isBio: true };
       }
 
-      // Direct Uncles / Aunts
       if (aFather && areSiblings(aFather, pB)) {
-        if (pB.gender === 'male') {
-          return { role: isOlder(pB, aFather) ? 'PEDDANANNA' : 'BABAI', isBio: false };
-        } else {
-          return { role: 'MENATTHA', isBio: false };
-        }
+        return { role: pB.gender === 'male' ? (isOlder(pB, aFather) ? 'PEDDANANNA' : 'BABAI') : 'MENATTHA', isBio: false };
       }
       if (aMother && areSiblings(aMother, pB)) {
-        if (pB.gender === 'male') {
-          return { role: 'MENAMAMA', isBio: false };
-        } else {
-          return { role: isOlder(pB, aMother) ? 'PEDDAMMA' : 'PINNI', isBio: false };
-        }
+        return { role: pB.gender === 'male' ? 'MENAMAMA' : (isOlder(pB, aMother) ? 'PEDDAMMA' : 'PINNI'), isBio: false };
       }
 
-      // Uncles' / Aunts' Spouses
       if (pB.spouseId) {
         const bSpouse = family.find(m => m.id === pB.spouseId);
         if (bSpouse) {
@@ -346,7 +339,6 @@ const defaultFamily = [
         }
       }
 
-      // Cousins
       for (let bp of bParents) {
         if (aFather && areSiblings(aFather, bp)) {
           return {
@@ -362,7 +354,6 @@ const defaultFamily = [
         }
       }
 
-      // Direct In-laws
       if (pA.spouseId) {
         const spouse = family.find(m => m.id === pA.spouseId);
         if (spouse) {
@@ -370,11 +361,12 @@ const defaultFamily = [
             return { role: pB.gender === 'male' ? 'MAMAGARU' : 'ATTAGARU', isBio: false };
           }
           if (areSiblings(spouse, pB)) {
-            if (pA.gender === 'male') {
-              return { role: pB.gender === 'male' ? 'WIFE_BROTHER' : 'WIFE_SISTER', isBio: false };
-            } else {
-              return { role: pB.gender === 'male' ? 'HUSBAND_BROTHER' : 'HUSBAND_SISTER', isBio: false };
-            }
+            return {
+              role: pA.gender === 'male' 
+                ? (pB.gender === 'male' ? 'WIFE_BROTHER' : 'WIFE_SISTER')
+                : (pB.gender === 'male' ? 'HUSBAND_BROTHER' : 'HUSBAND_SISTER'),
+              isBio: false
+            };
           }
         }
       }
@@ -383,20 +375,6 @@ const defaultFamily = [
       for (let sib of aSiblings) {
         if (sib.spouseId === pB.id) {
           return { role: pB.gender === 'male' ? 'SISTER_HUSBAND' : 'BROTHER_WIFE', isBio: false };
-        }
-      }
-
-      if (pA.spouseId) {
-        const spouse = family.find(m => m.id === pA.spouseId);
-        if (spouse) {
-          if (pA.gender === 'male') {
-            const wifeSisters = family.filter(m => areSiblings(spouse, m) && m.gender === 'female');
-            if (wifeSisters.some(ws => ws.spouseId === pB.id)) return { role: 'TODALLUDU', isBio: false };
-          }
-          if (pA.gender === 'female') {
-            const husbandBrothers = family.filter(m => areSiblings(spouse, m) && m.gender === 'male');
-            if (husbandBrothers.some(hb => hb.spouseId === pB.id)) return { role: 'TODIKODALU', isBio: false };
-          }
         }
       }
 
@@ -417,7 +395,6 @@ const defaultFamily = [
       return null;
     }
 
-    // Comprehensive Graph Traversal Resolver (With Recursion Safeguard)
     function computeKinship(targetId, visited = new Set()) {
       if (targetId === focusPersonId) return "You (నేను)";
       if (visited.has(targetId)) return "";
@@ -427,11 +404,9 @@ const defaultFamily = [
       const target = family.find(m => m.id === targetId);
       if (!focus || !target) return "";
 
-      // Step 1: Direct Nuclear Relation
       const direct = getDirectKinshipRole(focus, target);
       if (direct) return renderKinshipString(direct.role, direct.isBio, focus, target);
 
-      // Step 2: Via Own Spouse (Vasantha -> Ashok's relatives, Navya -> Arjun's relatives)
       if (focus.spouseId) {
         const spouse = family.find(m => m.id === focus.spouseId);
         if (spouse) {
@@ -441,12 +416,9 @@ const defaultFamily = [
             if (r === 'FATHER') return "మామగారు (Mamagaru)";
             if (r === 'MOTHER') return "అత్తగారు / అత్త (Atthagaru)";
             if (r === 'PATERNAL_GRANDFATHER' || r === 'MATERNAL_GRANDFATHER') return "తాతగారు / తాతయ్య (Taatayya)";
-            
-            // Custom Grandparent Swapping
             if (r === 'MATERNAL_GRANDMOTHER') return "నానమ్మ (Nanamma)";
             if (r === 'PATERNAL_GRANDMOTHER') return "అమ్మమ్మ (Ammamma)";
 
-            // Spouse's Siblings
             if (focus.gender === 'female') {
               if (r === 'BROTHER') return isOlder(target, spouse) ? "బావగారు (Bavagaru)" : "మరిది (Maridi)";
               if (r === 'SISTER') return isOlder(target, spouse) ? "వదిన (Vadina)" : "ఆడబిడ్డ (Aadabidda)";
@@ -455,30 +427,14 @@ const defaultFamily = [
               if (r === 'SISTER') return isOlder(target, spouse) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
             }
 
-            // Spouse's Sister's Husband (e.g. Vasantha -> Laxman, Srinivas, Raju)
-            if (r === 'SISTER_HUSBAND') {
-              return isOlder(target, spouse) ? "బావగారు (Bavagaru)" : "బావగారు / మరిది (Bavagaru / Maridi)";
-            }
-            if (r === 'BROTHER_WIFE') {
-              return isOlder(target, spouse) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
-            }
+            if (r === 'SISTER_HUSBAND') return isOlder(target, spouse) ? "బావగారు (Bavagaru)" : "బావగారు / మరిది (Bavagaru / Maridi)";
+            if (r === 'BROTHER_WIFE') return isOlder(target, spouse) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
 
-            // Spouse's Nephews & Nieces (e.g. Vasantha -> Arjun, Arun, Aravind, Harini)
             if (r === 'MENALLUDU') return "మేనల్లుడు (Menalludu)";
             if (r === 'MENAKODALU') return "మేనకోడలు (Menakodalu)";
             if (r === 'SON') return "కొడుకు (Koduku)";
             if (r === 'DAUGHTER') return "కూతురు (Kooturu)";
 
-            // Spouse's Uncles & Aunts
-            if (r === 'PEDDANANNA') return "పెద్దనాన్న / మామగారు (Mamagaru)";
-            if (r === 'BABAI') return "బాబాయ్ / మామగారు (Mamagaru)";
-            if (r === 'PEDDAMMA') return "పెద్దమ్మ / అత్తగారు (Peddamma)";
-            if (r === 'PINNI') return "పిన్ని / అత్తగారు (Pinni)";
-            if (r === 'MENAMAMA') return "మామగారు / మామయ్య (Mamagaru)";
-            if (r === 'MENATTHA' || r === 'ATTAYYA') return "అత్తగారు (Atthagaru)";
-            if (r === 'MAMAYYA') return "మామగారు (Mamagaru)";
-
-            // Spouse's Cousins
             if (r === 'CROSS_MALE_COUSIN') {
               return focus.gender === 'female' 
                 ? (isOlder(target, spouse) ? "బావగారు (Bavagaru)" : "మరిది (Maridi)")
@@ -493,7 +449,6 @@ const defaultFamily = [
         }
       }
 
-      // Step 3: Via Sibling's Spouse (Ammulu -> Navya -> Arjun's Family)
       const mySiblings = family.filter(m => areSiblings(focus, m));
       for (let sib of mySiblings) {
         if (sib.spouseId) {
@@ -502,11 +457,9 @@ const defaultFamily = [
             if (sibSpouse.id === target.id) {
               return isOlder(sibSpouse, focus) ? "బావ (Bava)" : "మరిది (Maridi)";
             }
-
             if (getAllParents(target).some(p => p.id === sib.id || p.id === sibSpouse.id)) {
               return target.gender === 'male' ? "మేనల్లుడు (Menalludu)" : "మేనకోడలు (Menakodalu)";
             }
-
             const rArjun = getDirectKinshipRole(sibSpouse, target);
             if (rArjun) {
               const r = rArjun.role;
@@ -549,7 +502,6 @@ const defaultFamily = [
         }
       }
 
-      // Step 4: Spouses of Mapped Kin (Vasantha -> Navya, or Ratnavva -> In-laws)
       if (target.spouseId) {
         const tSpouse = family.find(m => m.id === target.spouseId);
         if (tSpouse) {
@@ -566,7 +518,6 @@ const defaultFamily = [
         }
       }
 
-      // Step 5: Downward Propagation (Grandchildren & Great-Grandchildren)
       for (let p of getAllParents(target)) {
         const pRelStr = computeKinship(p.id, new Set(visited));
         if (pRelStr.includes("కొడుకు") || pRelStr.includes("కూతురు") || pRelStr.includes("మేనల్లుడు") || pRelStr.includes("మేనకోడలు")) {
@@ -577,7 +528,6 @@ const defaultFamily = [
         }
       }
 
-      // Step 6: Parents & Siblings of Kodalu / Alludu (Bhumeshwar, Laxmi, Ammulu, Narasaiah, Ratnavva)
       const allRelatives = family.filter(m => m.id !== focus.id);
       for (let rel of allRelatives) {
         const relStr = computeKinship(rel.id, new Set(visited));
@@ -596,7 +546,6 @@ const defaultFamily = [
         }
       }
 
-      // Step 7: Ratnavva / Narasaiah Couple-Preserving Extensions
       const focusChildren = family.filter(m => getAllParents(m).some(p => p.id === focus.id || (focus.spouseId && p.id === focus.spouseId)));
       for (let ch of focusChildren) {
         if (ch.spouseId) {
@@ -635,8 +584,6 @@ const defaultFamily = [
       if (role === 'ALLUDU') return "అల్లుడు (Alludu)";
       if (role === 'MENALLUDU') return "మేనల్లుడు (Menalludu)";
       if (role === 'MENAKODALU') return "మేనకోడలు (Menakodalu)";
-      if (role === 'TODALLUDU') return "తోడల్లుడు / సడ్డుగుడు (Todalludu)";
-      if (role === 'TODIKODALU') return "తోడికోడలు (Todikodalu)";
 
       if (role === 'WIFE_BROTHER') return isOlder(target, focus) ? "బావ (Bava)" : "బావమరిది (Bavamariidi)";
       if (role === 'WIFE_SISTER') return isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
@@ -660,18 +607,14 @@ const defaultFamily = [
       if (role === 'MAMAYYA') return "మామయ్య (Mamayya)";
 
       if (role === 'CROSS_MALE_COUSIN') {
-        if (focus.gender === 'female') {
-          return isOlder(target, focus) ? "బావగారు (Bavagaru)" : "మరిది (Maridi)";
-        } else {
-          return isOlder(target, focus) ? "బావ (Bava)" : "బావమరిది (Bavamariidi)";
-        }
+        return focus.gender === 'female' 
+          ? (isOlder(target, focus) ? "బావగారు (Bavagaru)" : "మరిది (Maridi)")
+          : (isOlder(target, focus) ? "బావ (Bava)" : "బావమరిది (Bavamariidi)");
       }
       if (role === 'CROSS_FEMALE_COUSIN') {
-        if (focus.gender === 'female') {
-          return isOlder(target, focus) ? "వదిన (Vadina)" : "ఆడబిడ్డ (Aadabidda)";
-        } else {
-          return isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
-        }
+        return focus.gender === 'female'
+          ? (isOlder(target, focus) ? "వదిన (Vadina)" : "ఆడబిడ్డ (Aadabidda)")
+          : (isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)");
       }
 
       return "చుట్టరికం (Relative)";
@@ -712,22 +655,17 @@ const defaultFamily = [
         focusPersonId = family[0] ? family[0].id : "1";
       }
 
-      if (family.length === 0) {
-        family = [{ id: "1", name: "Family Head", gender: "male", dob: "1990-01-01", spouseId: null, anniversary: null, parentIds: [] }];
-        focusPersonId = "1";
-      }
-
       persistFamilyData();
       renderTree();
       updateHeaderInputs();
     }
 
     function clearStorageAndReset() {
-      if (confirm("Reset tree to default? This will clear local records on this device.")) {
+      if (confirm("Reset tree to default 25 members?")) {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(FOCUS_KEY);
         family = defaultFamily;
-        focusPersonId = family[0].id;
+        focusPersonId = family.find(m => m.name.toLowerCase() === "arjun")?.id || family[0].id;
         persistFamilyData();
         renderTree();
         updateHeaderInputs();
@@ -765,7 +703,7 @@ const defaultFamily = [
 
     const svg = d3.select("#treeCanvas");
     const container = svg.append("g");
-    const zoom = d3.zoom().scaleExtent([0.2, 2.5]).on("zoom", (e) => container.attr("transform", e.transform));
+    const zoom = d3.zoom().scaleExtent([0.15, 2.5]).on("zoom", (e) => container.attr("transform", e.transform));
     svg.call(zoom);
 
     function getRootPerson() {
@@ -932,9 +870,7 @@ const defaultFamily = [
 
           return `
             <div class="bg-slate-800 border ${isMainActive ? 'border-amber-400 ring-2 ring-amber-400/50 shadow-2xl' : 'border-slate-700 shadow-xl'} rounded-2xl transition p-3.5 flex flex-col justify-between h-full">
-              <!-- Top Row: Members -->
               <div class="flex items-start justify-between gap-2">
-                <!-- Primary Member -->
                 <div class="flex items-start gap-2.5 p-1.5 rounded-xl transition ${!isSpouseActive ? 'bg-slate-700/80 ring-1 ring-indigo-400 shadow-sm' : 'opacity-70 hover:opacity-100 hover:bg-slate-700/40'}" onclick="setFocusPerson('${m.id}')">
                   <div class="w-8 h-8 rounded-full ${m.gender === 'female' ? 'bg-rose-600' : 'bg-indigo-600'} flex items-center justify-center shrink-0 mt-0.5 shadow-md">
                     ${m.gender === 'female' ? FEMALE_ICON : MALE_ICON}
@@ -950,7 +886,6 @@ const defaultFamily = [
                   </div>
                 </div>
 
-                <!-- Spouse Member -->
                 ${spouse ? `
                   <div class="flex items-start gap-2.5 p-1.5 rounded-xl transition border-l pl-2 border-slate-700 ${isSpouseActive ? 'bg-slate-700/80 ring-1 ring-rose-400 shadow-sm' : 'opacity-70 hover:opacity-100 hover:bg-slate-700/40'}" onclick="event.stopPropagation(); setFocusPerson('${spouse.id}')">
                     <div class="text-right">
@@ -969,13 +904,11 @@ const defaultFamily = [
                 ` : ''}
               </div>
 
-              <!-- Context Bar -->
               <div class="flex justify-between items-center px-2 text-[9px] text-slate-300 bg-slate-900/80 py-1 rounded-md border border-slate-700/80">
                 <span>Actions for: <strong class="text-indigo-300 font-bold">${activePerson.name}</strong></span>
-                <span class="text-[8px] text-slate-400 font-normal">(Click spouse above to switch)</span>
+                <span class="text-[8px] text-slate-400 font-normal">(Tap spouse above to switch)</span>
               </div>
 
-              <!-- Row 1 Actions -->
               <div class="grid grid-cols-4 gap-1.5 pt-0.5 text-[9px] font-bold">
                 <button onclick="openAddModal('${activePersonId}', 'father')" class="bg-slate-700 hover:bg-indigo-600 text-slate-200 hover:text-white py-1 rounded-md border border-slate-600 shadow-sm transition text-center ${hasFather ? 'opacity-30 pointer-events-none' : ''}">+ Nanna</button>
                 <button onclick="openAddModal('${activePersonId}', 'mother')" class="bg-slate-700 hover:bg-rose-600 text-slate-200 hover:text-white py-1 rounded-md border border-slate-600 shadow-sm transition text-center ${hasMother ? 'opacity-30 pointer-events-none' : ''}">+ Amma</button>
@@ -983,7 +916,6 @@ const defaultFamily = [
                 <button onclick="openAddModal('${activePersonId}', 'child')" class="bg-slate-700 hover:bg-emerald-600 text-slate-200 hover:text-white py-1 rounded-md border border-slate-600 shadow-sm transition text-center ${isChild ? 'col-span-2' : ''}">+ Child</button>
               </div>
 
-              <!-- Row 2 Actions -->
               <div class="grid grid-cols-2 gap-1.5 text-[9px] font-bold">
                 <button onclick="openAddModal('${activePersonId}', 'brother')" class="bg-slate-700 hover:bg-indigo-600 text-slate-200 hover:text-white py-1 rounded-md border border-slate-600 shadow-sm transition text-center flex items-center justify-center gap-1">
                   <span>+ Brother</span> <span class="text-[8px] opacity-75 font-normal">(అన్న/తమ్ముడు)</span>
@@ -1165,7 +1097,7 @@ const defaultFamily = [
 
       const unique = [...new Set(events)];
       if (unique.length === 0) {
-        list.innerHTML = `<p class="text-slate-400">No events in the next 30 days.</p>`;
+        list.innerHTML = `<p class="text-slate-400">No events in next 30 days.</p>`;
       } else {
         unique.forEach(e => {
           const item = document.createElement("div");
@@ -1185,9 +1117,14 @@ const defaultFamily = [
     }
 
     function resetZoom() {
-      svg.transition().duration(750).call(
+      const w = window.innerWidth || document.documentElement.clientWidth || 800;
+      const scale = w < 768 ? 0.45 : 0.8;
+      const startX = w / 2;
+      const startY = w < 768 ? 40 : 80;
+
+      svg.transition().duration(500).call(
         zoom.transform,
-        d3.zoomIdentity.translate(window.innerWidth / 2, 80).scale(0.85)
+        d3.zoomIdentity.translate(startX, startY).scale(scale)
       );
     }
 
@@ -1195,11 +1132,12 @@ const defaultFamily = [
       document.getElementById("eventsDrawer").classList.toggle("hidden");
     }
 
-    window.onload = () => {
+    // Explicit Startup Sequence
+    window.addEventListener("DOMContentLoaded", () => {
       updateHeaderInputs();
-      resetZoom();
       renderTree();
-    };
+      setTimeout(resetZoom, 150);
+    });
   </script>
 </body>
 </html>
