@@ -14,10 +14,9 @@
 </head>
 <body class="bg-slate-50 relative">
 
-  <!-- Top Navigation & Controls -->
+  <!-- Header Controls -->
   <header class="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
     
-    <!-- Left: Main Head & Focus Context -->
     <div class="pointer-events-auto flex items-center gap-3 bg-white/95 backdrop-blur border border-slate-200 shadow-sm rounded-xl p-2 px-4">
       <span class="text-2xl">🌳</span>
       <div class="flex items-center gap-2 border-r border-slate-200 pr-3">
@@ -35,24 +34,18 @@
       </div>
     </div>
 
-    <!-- Center: Search Bar -->
     <div class="pointer-events-auto flex items-center bg-white/95 backdrop-blur border border-slate-200 shadow-sm rounded-xl px-3 py-2 w-56 md:w-64">
       <span class="text-slate-400 mr-2 text-sm">🔍</span>
       <input id="searchInput" type="text" placeholder="Search relative..." class="w-full bg-transparent text-xs md:text-sm focus:outline-none text-slate-800 placeholder-slate-400" oninput="handleSearch(this.value)">
     </div>
 
-    <!-- Right: Sharing & Actions -->
     <div class="pointer-events-auto flex items-center gap-2">
-      <!-- One-Click Instant Share Link -->
       <button onclick="shareLinkToBrother()" class="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm text-xs md:text-sm px-3 py-2 rounded-xl transition flex items-center gap-1.5 font-semibold">
         <span>🔗</span> Share Link
       </button>
-
-      <!-- Cloud Sync & Backup Options -->
       <button onclick="toggleCloudModal()" class="bg-white/95 hover:bg-slate-100 border border-slate-200 text-slate-700 shadow-sm text-xs md:text-sm px-3 py-2 rounded-xl transition flex items-center gap-1.5 font-medium">
         <span>☁️</span> Cloud / Sync
       </button>
-
       <button onclick="toggleEventsPanel()" class="bg-white/95 hover:bg-slate-100 border border-slate-200 text-slate-700 shadow-sm text-xs md:text-sm px-3 py-2 rounded-xl transition flex items-center gap-1.5 font-medium">
         <span>🎉</span> Events
       </button>
@@ -70,17 +63,16 @@
     <div id="eventsList" class="space-y-2 text-xs text-slate-600 max-h-80 overflow-y-auto"></div>
   </div>
 
-  <!-- Cloud Sync & Import/Export Modal -->
+  <!-- Cloud Sync Modal -->
   <div id="cloudModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-slate-100">
       <button onclick="toggleCloudModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">✕</button>
       <h3 class="font-bold text-slate-800 text-base mb-1">Family Sync & Backup</h3>
-      <p class="text-xs text-slate-500 mb-4">Share with family without re-entering relationships.</p>
+      <p class="text-xs text-slate-500 mb-4">Share your tree across family phones without re-entering.</p>
 
-      <!-- Option 1: Live Cloud Room Key -->
       <div class="mb-5 p-3.5 bg-blue-50/60 border border-blue-100 rounded-xl">
         <h4 class="text-xs font-bold text-blue-900 mb-1">Method 1: Live Family Room Sync</h4>
-        <p class="text-[11px] text-slate-600 mb-2">Use a shared family name. Both you and your brother type the same room name to edit the exact same tree live.</p>
+        <p class="text-[11px] text-slate-600 mb-2">Type a room code (e.g. sharma-family). Your brother enters the same room name to sync live.</p>
         <div class="flex items-center gap-2">
           <input id="cloudRoomKey" type="text" placeholder="e.g. sharma-family-hyd" class="w-full border border-blue-200 rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-blue-500">
           <button onclick="saveToCloudRoom()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg shrink-0">Upload</button>
@@ -88,10 +80,8 @@
         </div>
       </div>
 
-      <!-- Option 2: File Import / Export Backup -->
       <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
         <h4 class="text-xs font-bold text-slate-800 mb-1">Method 2: One-Time Backup File</h4>
-        <p class="text-[11px] text-slate-500 mb-3">Download a file or restore from a previous file.</p>
         <div class="flex items-center gap-2">
           <button onclick="exportFamilyJson()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">Download File (.json)</button>
           <label class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer">
@@ -103,7 +93,7 @@
     </div>
   </div>
 
-  <!-- Main Canvas -->
+  <!-- SVG Canvas -->
   <svg id="treeCanvas" class="w-full h-full"></svg>
 
   <!-- Add Relative Modal -->
@@ -202,8 +192,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "dynamic_family_tree_dual_v7";
-    const FOCUS_KEY = "dynamic_family_tree_focus_v7";
+    const STORAGE_KEY = "dynamic_family_tree_dual_v8";
+    const FOCUS_KEY = "dynamic_family_tree_focus_v8";
     const CLOUD_ROOM_KEY = "dynamic_family_tree_cloud_room";
 
     const defaultFamily = [
@@ -214,7 +204,6 @@
     let family = loadInitialFamily();
     let focusPersonId = localStorage.getItem(FOCUS_KEY) || family[0]?.id || "1";
 
-    // Detect if URL contains shared tree data from WhatsApp/Link
     function loadInitialFamily() {
       const urlParams = new URLSearchParams(window.location.search);
       const dataParam = urlParams.get("data");
@@ -223,11 +212,11 @@
           const decoded = JSON.parse(decodeURIComponent(escape(atob(dataParam))));
           if (Array.isArray(decoded) && decoded.length > 0) {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(decoded));
-            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
             return decoded;
           }
         } catch (e) {
-          console.error("Could not parse shared link data", e);
+          console.error(e);
         }
       }
 
@@ -243,7 +232,6 @@
       localStorage.setItem(FOCUS_KEY, focusPersonId);
     }
 
-    // 1. WhatsApp / Direct Link Share
     function shareLinkToBrother() {
       try {
         const jsonStr = JSON.stringify(family);
@@ -251,19 +239,18 @@
         const shareUrl = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
         
         navigator.clipboard.writeText(shareUrl).then(() => {
-          alert(`Link copied to clipboard!\n\nSend this link to your brother via WhatsApp or Message. When he clicks it, your full ${family.length}-member tree will open directly on his phone.`);
+          alert(`Link copied to clipboard!\n\nSend this to your brother on WhatsApp. When he opens it, all relatives will appear directly on his phone.`);
         }).catch(() => {
           prompt("Copy this link and send to your brother:", shareUrl);
         });
       } catch (err) {
-        alert("Tree is large; please use the Cloud Room or Export JSON option.");
+        alert("Please use the Cloud Room or Export JSON option.");
       }
     }
 
-    // 2. Cloud Room Sync (Using Key-Value Cloud Storage API)
     async function saveToCloudRoom() {
       const room = document.getElementById("cloudRoomKey").value.trim();
-      if (!room) { alert("Please enter a room name (e.g. sharma-family)"); return; }
+      if (!room) { alert("Please enter a room name"); return; }
       localStorage.setItem(CLOUD_ROOM_KEY, room);
 
       try {
@@ -273,16 +260,16 @@
           body: JSON.stringify(family)
         });
         if (res.ok) {
-          alert(`Tree successfully uploaded to cloud room: "${room}".\n\nYour brother just needs to open this app, click Cloud Sync, enter "${room}", and click Fetch.`);
+          alert(`Tree successfully uploaded to room: "${room}".\n\nYour brother opens this page, types "${room}", and clicks Fetch.`);
         }
       } catch (e) {
-        alert("Upload failed. Check your internet connection.");
+        alert("Upload failed. Check connection.");
       }
     }
 
     async function loadFromCloudRoom() {
       const room = document.getElementById("cloudRoomKey").value.trim();
-      if (!room) { alert("Please enter the room name"); return; }
+      if (!room) { alert("Please enter room name"); return; }
       localStorage.setItem(CLOUD_ROOM_KEY, room);
 
       try {
@@ -299,14 +286,13 @@
             alert(`Loaded ${family.length} members from cloud room "${room}"!`);
           }
         } else {
-          alert(`Room "${room}" not found. Ensure the uploader has clicked Upload first.`);
+          alert(`Room "${room}" not found.`);
         }
       } catch (e) {
         alert("Could not connect to cloud sync.");
       }
     }
 
-    // 3. File Export & Import
     function exportFamilyJson() {
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(family, null, 2));
       const downloadAnchor = document.createElement('a');
@@ -348,7 +334,7 @@
     }
 
     function clearStorageAndReset() {
-      if (confirm("Reset tree to initial pair? All custom additions will be cleared.")) {
+      if (confirm("Reset tree? All custom additions will be cleared.")) {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(FOCUS_KEY);
         family = defaultFamily;
@@ -419,7 +405,9 @@
       }
     }
 
-    // Kinship Engine
+    // ==========================================
+    // COMPLETE TELUGU KINSHIP ENGINE
+    // ==========================================
     function computeKinship(targetId) {
       if (targetId === focusPersonId) return "You (నేను)";
 
@@ -438,109 +426,231 @@
         return new Date(target.dob) < new Date(person.dob);
       };
 
+      // Helper: Check if two people are siblings
+      const areSiblings = (p1, p2) => {
+        if (!p1 || !p2 || p1.id === p2.id) return false;
+        const p1Parents = p1.parentIds || [];
+        const p2Parents = p2.parentIds || [];
+        return p1Parents.some(id => p2Parents.includes(id));
+      };
+
       // 1. Spouse
       if (focus.spouseId === targetId) {
-        return target.gender === "female" ? "Bharya / Wife (భార్య)" : "Bartha / Husband (భర్త)";
+        return target.gender === "female" ? "భార్య (Bharya)" : "భర్త (Bhartha)";
       }
 
       // 2. Direct Parents
       if (focus.parentIds && focus.parentIds.includes(targetId)) {
-        return target.gender === "female" ? "Amma (అమ్మ)" : "Nanna (నాన్న)";
+        return target.gender === "female" ? "తల్లి / అమ్మ (Talli / Amma)" : "తండ్రి / నాన్న (Tandri / Nanna)";
       }
 
       // 3. Direct Children
       if (target.parentIds && (target.parentIds.includes(focusPersonId) || (focus.spouseId && target.parentIds.includes(focus.spouseId)))) {
-        return target.gender === "female" ? "Kuturu (కూతురు)" : "Koduku (కొడుకు)";
+        return target.gender === "female" ? "కుమార్తె / కూతురు (Kooturu)" : "కొడుకు (Koduku)";
       }
 
       // 4. Siblings
-      const sharedParents = focusParents.filter(fp => targetParents.some(tp => tp.id === fp.id));
-      if (sharedParents.length > 0) {
+      if (areSiblings(focus, target)) {
         const isOlder = isTargetOlderThan(focus);
         if (target.gender === "male") {
-          return isOlder ? "Anna / Annayya (అన్న / అన్నయ్య)" : "Tammudu (తమ్ముడు)";
+          return isOlder ? "అన్నయ్య / పెద్ద అన్నయ్య (Annayya)" : "తమ్ముడు (Tammudu)";
         } else {
-          return isOlder ? "Akka (అక్క)" : "Chelli / Chellalu (చెల్లి / చెల్లెలు)";
+          return isOlder ? "అక్క (Akka)" : "చెల్లి (Chelli)";
         }
       }
 
-      // 5. In-Laws (Transitive)
+      // 5. In-Laws (Children's Spouses)
       const focusChildren = family.filter(m => (m.parentIds || []).includes(focusPersonId) || (focus.spouseId && (m.parentIds || []).includes(focus.spouseId)));
       for (let child of focusChildren) {
         if (child.spouseId === targetId) {
-          return target.gender === "female" ? "Kodalu (కోడలు)" : "Alludu (అల్లుడు)";
+          return target.gender === "female" ? "కోడలు (Kodalu)" : "అల్లుడు (Alludu)";
         }
       }
 
+      // 6. Spouse's Parents (Parents-in-law)
       if (focus.spouseId) {
         const spouse = family.find(m => m.id === focus.spouseId);
         if (spouse && (spouse.parentIds || []).includes(targetId)) {
-          return target.gender === "female" ? "Atta / Attagaru (అత్త / అత్తగారు)" : "Mavagaru / Mama (మామగారు / మామ)";
+          return target.gender === "female" ? "అత్తగారు / అత్త (Atthagaru / Attha)" : "మామగారు (Mamagaru)";
         }
-        if (spouse) {
-          const spouseParents = (spouse.parentIds || []).map(id => family.find(m => m.id === id)).filter(Boolean);
-          const isSpouseSibling = spouseParents.some(sp => (target.parentIds || []).includes(sp.id));
-          if (isSpouseSibling) {
+      }
+
+      // 7. Brothers-in-law & Sisters-in-law
+      // Case A: Spouse's Siblings
+      if (focus.spouseId) {
+        const spouse = family.find(m => m.id === focus.spouseId);
+        if (spouse && areSiblings(spouse, target)) {
+          const isOlder = isTargetOlderThan(spouse);
+          if (focus.gender === "male") {
+            // Man's wife's siblings
             if (target.gender === "male") {
-              return isTargetOlderThan(spouse) ? "Bava (బావ)" : "Maridi (మరిది)";
+              return isOlder ? "బావ (Bava)" : "బావమరిది (Bavamariidi)";
             } else {
-              return "Vadina (వదిన)";
+              return isOlder ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
+            }
+          } else {
+            // Woman's husband's siblings
+            if (target.gender === "male") {
+              return isOlder ? "బావ (Bava)" : "మరిది (Maridi)";
+            } else {
+              return isOlder ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
             }
           }
         }
       }
 
+      // Case B: Sibling's Spouse
       for (let fp of focusParents) {
         const mySiblings = family.filter(m => m.id !== focus.id && (m.parentIds || []).includes(fp.id));
         for (let sib of mySiblings) {
           if (sib.spouseId === targetId) {
-            if (target.gender === "female") return "Vadina (వదిన)";
-            return isTargetOlderThan(focus) ? "Bava (బావ)" : "Maridi (మరిది)";
+            const isOlder = isTargetOlderThan(focus);
+            if (target.gender === "female") {
+              return isOlder ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
+            } else {
+              return isOlder ? "బావ (Bava)" : "మరిది (Maridi)";
+            }
           }
         }
       }
 
-      // 6. Grandparents & Grandchildren
+      // Case C: Co-Sister / Co-Brother
+      if (focus.spouseId) {
+        const spouse = family.find(m => m.id === focus.spouseId);
+        if (spouse) {
+          // Wife's Sister's Husband -> తోడల్లుడు (Todalludu)
+          if (focus.gender === "male") {
+            const wifeSisters = family.filter(m => areSiblings(spouse, m) && m.gender === "female");
+            for (let ws of wifeSisters) {
+              if (ws.spouseId === targetId) return "తోడల్లుడు (Todalludu)";
+            }
+          }
+          // Husband's Brother's Wife -> తోడికోడలు (Todikodalu)
+          if (focus.gender === "female") {
+            const husbandBrothers = family.filter(m => areSiblings(spouse, m) && m.gender === "male");
+            for (let hb of husbandBrothers) {
+              if (hb.spouseId === targetId) return "తోడికోడలు (Todikodalu)";
+            }
+          }
+        }
+      }
+
+      // 8. Maternal Relations (Mother's Side)
+      if (focusMother) {
+        // Mother's Brother -> మేనమామ / మామయ్య
+        if (areSiblings(focusMother, target) && target.gender === "male") {
+          return "మామయ్య / మేనమామ (Mamayya / Menamama)";
+        }
+        // Mother's Brother's Wife -> అత్త / అత్తయ్య
+        const motherBrothers = family.filter(m => areSiblings(focusMother, m) && m.gender === "male");
+        for (let mb of motherBrothers) {
+          if (mb.spouseId === targetId) return "అత్త / అత్తయ్య (Attha / Atthayya)";
+        }
+
+        // Mother's Sister -> పెద్దమ్మ / పిన్ని
+        if (areSiblings(focusMother, target) && target.gender === "female") {
+          return isTargetOlderThan(focusMother) 
+            ? "పెద్దమ్మ / దొడ్డమ్మ (Peddamma / Doddamma)" 
+            : "చిన్నమ్మ / పిన్ని (Chinnamma / Pinni)";
+        }
+
+        // Mother's Sister's Husband -> బాబాయ్ / పెద్దనాన్న
+        const motherSisters = family.filter(m => areSiblings(focusMother, m) && m.gender === "female");
+        for (let ms of motherSisters) {
+          if (ms.spouseId === targetId) {
+            return isTargetOlderThan(focusMother)
+              ? "పెద్దనాన్న / పెద్దతండ్రి (Peddananna)"
+              : "బాబాయ్ / చిన్నాయన (Babai / Chinnaayana)";
+          }
+        }
+      }
+
+      // 9. Paternal Relations (Father's Side)
+      if (focusFather) {
+        // Father's Sister -> మేనత్త / అత్తయ్య
+        if (areSiblings(focusFather, target) && target.gender === "female") {
+          return "మేనత్త / అత్తయ్య (Menattha / Atthayya)";
+        }
+        // Father's Sister's Husband -> మామయ్య
+        const fatherSisters = family.filter(m => areSiblings(focusFather, m) && m.gender === "female");
+        for (let fs of fatherSisters) {
+          if (fs.spouseId === targetId) return "మామయ్య (Mamayya)";
+        }
+
+        // Father's Brother -> పెద్దనాన్న / బాబాయ్
+        if (areSiblings(focusFather, target) && target.gender === "male") {
+          return isTargetOlderThan(focusFather) 
+            ? "పెద్దనాన్న / పెద్దనాయన (Peddananna)" 
+            : "బాబాయ్ / చిన్నాయన (Babai / Chinnaayana)";
+        }
+
+        // Father's Brother's Wife -> పెద్దమ్మ / పిన్ని
+        const fatherBrothers = family.filter(m => areSiblings(focusFather, m) && m.gender === "male");
+        for (let fb of fatherBrothers) {
+          if (fb.spouseId === targetId) {
+            return isTargetOlderThan(focusFather)
+              ? "పెద్దమ్మ / పెత్తల్లి (Peddamma / Pethalli)"
+              : "చిన్నమ్మ / పిన్ని (Chinnamma / Pinni)";
+          }
+        }
+      }
+
+      // 10. Nephews & Nieces
+      for (let fp of focusParents) {
+        const mySiblings = family.filter(m => m.id !== focus.id && (m.parentIds || []).includes(fp.id));
+        for (let sib of mySiblings) {
+          if ((target.parentIds || []).includes(sib.id)) {
+            // Cross-sex sibling's child (Menalludu / Menakodalu)
+            if ((focus.gender === "male" && sib.gender === "female") || (focus.gender === "female" && sib.gender === "male")) {
+              return target.gender === "female" ? "మేనకోడలు (Menakodalu)" : "మేనల్లుడు (Menalludu)";
+            }
+            // Same-sex sibling's child (Treated as Son / Daughter)
+            return target.gender === "female" ? "కూతురు (Kooturu)" : "కొడుకు (Koduku)";
+          }
+        }
+      }
+
+      // 11. Grandparents & Grandchildren
       for (let child of focusChildren) {
         if ((target.parentIds || []).includes(child.id)) {
-          return target.gender === "female" ? "Manavaralu (మనవరాలు)" : "Manavadu (మనవడు)";
+          return target.gender === "female" ? "మనవరాలు (Manavaralu)" : "మనవడు (Manavadu)";
+        }
+        // Great Grandchildren
+        const grandChildren = family.filter(m => (m.parentIds || []).includes(child.id));
+        for (let gc of grandChildren) {
+          if ((target.parentIds || []).includes(gc.id)) {
+            return target.gender === "female" ? "మునిమనవరాలు (Muni manavaralu)" : "మునిమనవడు (Muni manavadu)";
+          }
         }
       }
 
+      // Grandparents
       if (focusFather && (focusFather.parentIds || []).includes(targetId)) {
-        return target.gender === "female" ? "Nannamma / Mamma (నానమ్మ / మామ్మ)" : "Tata / Tatayya (తాత / తాతయ్య)";
+        return target.gender === "female" ? "నానమ్మ / బామ్మ (Nanamma / Baamma)" : "తాత / తాతయ్య (Taata / Taathayya)";
       }
       if (focusMother && (focusMother.parentIds || []).includes(targetId)) {
-        return target.gender === "female" ? "Ammamma (అమ్మమ్మ)" : "Tata / Tatayya (తాత / తాతయ్య)";
+        return target.gender === "female" ? "అమ్మమ్మ (Ammamma)" : "తాతగారు / తాతయ్య (Taatayya)";
       }
 
-      // 7. Paternal Uncles & Aunts
+      // Great Grandparents
       if (focusFather) {
-        const fatherParents = focusFather.parentIds || [];
-        const isFatherSibling = fatherParents.some(pid => (target.parentIds || []).includes(pid));
-        if (isFatherSibling) {
-          if (target.gender === "male") {
-            return isTargetOlderThan(focusFather) ? "Peddananna (పెద్దనాన్న)" : "Chinnanna / Babai (చిన్ననాన్న / బాబాయ్)";
-          } else {
-            return "Atta / Attayya (అత్త / అత్తయ్య)";
+        const fParents = (focusFather.parentIds || []).map(id => family.find(m => m.id === id)).filter(Boolean);
+        for (let gp of fParents) {
+          if ((gp.parentIds || []).includes(targetId)) {
+            return target.gender === "female" ? "ముత్తవ్వ / తాతమ్మ (Mutthavva)" : "ముత్తాత (Muthaata)";
           }
         }
       }
-
-      // 8. Maternal Uncles & Aunts
       if (focusMother) {
-        const motherParents = focusMother.parentIds || [];
-        const isMotherSibling = motherParents.some(pid => (target.parentIds || []).includes(pid));
-        if (isMotherSibling) {
-          if (target.gender === "female") {
-            return isTargetOlderThan(focusMother) ? "Doddamma (పెద్దమ్మ / దొడ్డమ్మ)" : "Pinni (పిన్ని)";
-          } else {
-            return "Mama / Mamayya (మామ / మామయ్య)";
+        const mParents = (focusMother.parentIds || []).map(id => family.find(m => m.id === id)).filter(Boolean);
+        for (let gp of mParents) {
+          if ((gp.parentIds || []).includes(targetId)) {
+            return target.gender === "female" ? "ముత్తవ్వ / తాతమ్మ (Mutthavva)" : "ముత్తాత (Muthaata)";
           }
         }
       }
 
-      return "Relative (చుట్టం)";
+      return "చుట్టరికం (Relative)";
     }
 
     function setFocusPerson(id) {
