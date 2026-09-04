@@ -192,8 +192,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "dynamic_family_tree_matrix_v11";
-    const FOCUS_KEY = "dynamic_family_tree_focus_v11";
+    const STORAGE_KEY = "dynamic_family_tree_matrix_v12";
+    const FOCUS_KEY = "dynamic_family_tree_focus_v12";
     const CLOUD_ROOM_KEY = "dynamic_family_tree_cloud_room";
 
     const defaultFamily = [
@@ -233,10 +233,10 @@
     }
 
     // ==========================================
-    // COMPLETE GRAPH-PROPAGATION KINSHIP ENGINE
+    // RECURSION-SAFE KINSHIP ENGINE
     // ==========================================
     const isOlder = (p1, p2) => {
-      if (!p1.dob || !p2.dob) return false;
+      if (!p1 || !p2 || !p1.dob || !p2.dob) return false;
       return new Date(p1.dob) < new Date(p2.dob);
     };
 
@@ -247,8 +247,10 @@
       return p1P.some(id => p2P.includes(id));
     };
 
-    function getBaseRole(focus, target) {
+    function getBaseRole(focus, target, visited = new Set()) {
       if (!focus || !target || focus.id === target.id) return null;
+      if (visited.has(target.id)) return null; // Break circular recursion
+      visited.add(target.id);
 
       const getParents = (p) => (p.parentIds || []).map(id => family.find(m => m.id === id)).filter(Boolean);
       const focusParents = getParents(focus);
@@ -272,7 +274,7 @@
         return target.gender === 'male' ? 'BROTHER' : 'SISTER';
       }
 
-      // 4. Spouse's Sibling (In-Laws)
+      // 4. Spouse's Sibling
       if (focus.spouseId) {
         const spouse = family.find(m => m.id === focus.spouseId);
         if (spouse && areSiblings(spouse, target)) {
@@ -284,7 +286,7 @@
         }
       }
 
-      // 5. Todalludu (Wife's Sister's Husband) & Todikodalu (Husband's Brother's Wife)
+      // 5. Todalludu & Todikodalu
       if (focus.spouseId) {
         const spouse = family.find(m => m.id === focus.spouseId);
         if (spouse) {
@@ -299,7 +301,7 @@
         }
       }
 
-      // 6. Sibling's Children (Own Siblings)
+      // 6. Sibling's Children
       for (let fp of focusParents) {
         const mySibs = family.filter(m => m.id !== focus.id && (m.parentIds || []).includes(fp.id));
         for (let sib of mySibs) {
@@ -350,11 +352,11 @@
         }
       }
 
-      // 9. Grandchildren (Children of ANY person whose role is SON or DAUGHTER)
+      // 9. Grandchildren (Children of anyone whose role is SON, DAUGHTER, MENALLUDU, MENAKODALU)
       for (let pId of (target.parentIds || [])) {
         const parent = family.find(m => m.id === pId);
         if (parent) {
-          const pRole = getBaseRole(focus, parent);
+          const pRole = getBaseRole(focus, parent, new Set(visited));
           if (pRole === 'SON' || pRole === 'DAUGHTER' || pRole === 'MENALLUDU' || pRole === 'MENAKODALU') {
             return target.gender === 'male' ? 'GRANDSON' : 'GRANDDAUGHTER';
           }
@@ -365,14 +367,14 @@
       if (target.spouseId) {
         const tSpouse = family.find(m => m.id === target.spouseId);
         if (tSpouse) {
-          const sRole = getBaseRole(focus, tSpouse);
+          const sRole = getBaseRole(focus, tSpouse, new Set(visited));
           if (sRole === 'SON') return 'KODALU';
           if (sRole === 'DAUGHTER') return 'ALLUDU';
           if (sRole === 'WIFE_BROTHER') return 'WIFE_BROTHER_WIFE';
         }
       }
 
-      // 11. Paternal / Maternal Uncles & Aunts
+      // 11. Uncles & Aunts
       if (focusFather && areSiblings(focusFather, target)) {
         return target.gender === 'male' ? 'FATHER_BROTHER' : 'FATHER_SISTER';
       }
@@ -404,7 +406,6 @@
       const target = family.find(m => m.id === targetId);
       if (!focus || !target) return "";
 
-      // 1. Direct Spouse
       if (focus.spouseId === targetId) {
         return target.gender === "female" ? "భార్య (Bharya)" : "భర్త (Bhartha)";
       }
