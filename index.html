@@ -472,24 +472,38 @@
       }
 
       const focusChildren = family.filter(m => getAllParents(m).some(p => p.id === focus.id || (focus.spouseId && p.id === focus.spouseId)));
-      for (let ch of focusChildren) {
-        if (ch.spouseId) {
-          const chSpouse = family.find(m => m.id === ch.spouseId);
-          if (chSpouse) {
-            if (getAllParents(chSpouse).some(p => p.id === target.id)) {
-              return target.gender === 'male' ? "వియ్యంకుడు (Viyyankudu)" : "వియ్యపురాలు (Viyyaralu)";
-            }
-            if (areSiblings(chSpouse, target)) {
-              return target.gender === 'male' ? "వియ్యాల తమ్ముడు / అన్న (Viyyankudu)" : "వియ్యాల చెల్లి / అక్క (Viyyaralu)";
-            }
-            for (let sib of family.filter(m => areSiblings(chSpouse, m))) {
-              if (getAllParents(target).some(p => p.id === sib.id)) {
-                return "వియ్యాలవారు (Viyyala Varu)";
-              }
-            }
-          }
+// Step 5: Merge Daughter-in-law / Son-in-law siblings and their children
+for (let ch of focusChildren) {
+  if (ch.spouseId) {
+    const chSpouse = family.find(m => m.id === ch.spouseId);
+    if (chSpouse) {
+      // Parents of child's spouse remain Viyyankudu / Viyyaralu
+      if (getAllParents(chSpouse).some(p => p.id === target.id)) {
+        return target.gender === 'male' ? "వియ్యంకుడు (Viyyankudu)" : "వియ్యపురాలు (Viyyaralu)";
+      }
+
+      // Siblings of Daughter-in-law / Son-in-law merge into Kodalu / Alludu
+      if (areSiblings(chSpouse, target)) {
+        return target.gender === 'female' ? "కోడలు (Kodalu)" : "అల్లుడు (Alludu)";
+      }
+
+      // Spouses of those siblings also merge into Kodalu / Alludu
+      const spouseSibs = family.filter(m => areSiblings(chSpouse, m));
+      for (let ss of spouseSibs) {
+        if (ss.spouseId === target.id) {
+          return target.gender === 'female' ? "కోడలు (Kodalu)" : "అల్లుడు (Alludu)";
         }
       }
+
+      // Children of all those siblings are structurally your Grandchildren!
+      for (let ss of spouseSibs) {
+        if (getAllParents(target).some(p => p.id === ss.id || (ss.spouseId && p.id === ss.spouseId))) {
+          return target.gender === 'male' ? "మనవడు (Manavadu)" : "మనవరాలు (Manavaralu)";
+        }
+      }
+    }
+  }
+}
 
       if (focus.gender === 'female') {
         const daughters = family.filter(m => getAllParents(m).some(p => p.id === focus.id));
