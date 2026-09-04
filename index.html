@@ -192,8 +192,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "dynamic_family_tree_dual_v8";
-    const FOCUS_KEY = "dynamic_family_tree_focus_v8";
+    const STORAGE_KEY = "dynamic_family_tree_dual_v9";
+    const FOCUS_KEY = "dynamic_family_tree_focus_v9";
     const CLOUD_ROOM_KEY = "dynamic_family_tree_cloud_room";
 
     const defaultFamily = [
@@ -230,6 +230,52 @@
     function persistFamilyData() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(family));
       localStorage.setItem(FOCUS_KEY, focusPersonId);
+    }
+
+    // ==========================================
+    // DELETE MEMBER HANDLER
+    // ==========================================
+    function deleteMember(id) {
+      const person = family.find(m => m.id === id);
+      if (!person) return;
+
+      if (!confirm(`Are you sure you want to delete ${person.name}? This will remove them and update all links.`)) {
+        return;
+      }
+
+      // 1. Remove spouse link
+      if (person.spouseId) {
+        const spouse = family.find(m => m.id === person.spouseId);
+        if (spouse) {
+          spouse.spouseId = null;
+          spouse.anniversary = null;
+        }
+      }
+
+      // 2. Remove parent reference from any children
+      family.forEach(m => {
+        if (m.parentIds && m.parentIds.includes(id)) {
+          m.parentIds = m.parentIds.filter(pId => pId !== id);
+        }
+      });
+
+      // 3. Remove the member from family array
+      family = family.filter(m => m.id !== id);
+
+      // If we deleted the currently focused person, switch focus
+      if (focusPersonId === id) {
+        focusPersonId = family[0] ? family[0].id : "1";
+      }
+
+      // If tree became completely empty, restore 1 base person
+      if (family.length === 0) {
+        family = [{ id: "1", name: "Family Head", gender: "male", dob: "1990-01-01", spouseId: null, anniversary: null, parentIds: [] }];
+        focusPersonId = "1";
+      }
+
+      persistFamilyData();
+      renderTree();
+      updateHeaderInputs();
     }
 
     function shareLinkToBrother() {
@@ -405,9 +451,7 @@
       }
     }
 
-    // ==========================================
-    // COMPLETE TELUGU KINSHIP ENGINE
-    // ==========================================
+    // Kinship Engine
     function computeKinship(targetId) {
       if (targetId === focusPersonId) return "You (నేను)";
 
@@ -426,7 +470,6 @@
         return new Date(target.dob) < new Date(person.dob);
       };
 
-      // Helper: Check if two people are siblings
       const areSiblings = (p1, p2) => {
         if (!p1 || !p2 || p1.id === p2.id) return false;
         const p1Parents = p1.parentIds || [];
@@ -467,7 +510,7 @@
         }
       }
 
-      // 6. Spouse's Parents (Parents-in-law)
+      // 6. Spouse's Parents
       if (focus.spouseId) {
         const spouse = family.find(m => m.id === focus.spouseId);
         if (spouse && (spouse.parentIds || []).includes(targetId)) {
@@ -476,20 +519,17 @@
       }
 
       // 7. Brothers-in-law & Sisters-in-law
-      // Case A: Spouse's Siblings
       if (focus.spouseId) {
         const spouse = family.find(m => m.id === focus.spouseId);
         if (spouse && areSiblings(spouse, target)) {
           const isOlder = isTargetOlderThan(spouse);
           if (focus.gender === "male") {
-            // Man's wife's siblings
             if (target.gender === "male") {
               return isOlder ? "బావ (Bava)" : "బావమరిది (Bavamariidi)";
             } else {
               return isOlder ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
             }
           } else {
-            // Woman's husband's siblings
             if (target.gender === "male") {
               return isOlder ? "బావ (Bava)" : "మరిది (Maridi)";
             } else {
@@ -499,7 +539,6 @@
         }
       }
 
-      // Case B: Sibling's Spouse
       for (let fp of focusParents) {
         const mySiblings = family.filter(m => m.id !== focus.id && (m.parentIds || []).includes(fp.id));
         for (let sib of mySiblings) {
@@ -514,18 +553,15 @@
         }
       }
 
-      // Case C: Co-Sister / Co-Brother
       if (focus.spouseId) {
         const spouse = family.find(m => m.id === focus.spouseId);
         if (spouse) {
-          // Wife's Sister's Husband -> తోడల్లుడు (Todalludu)
           if (focus.gender === "male") {
             const wifeSisters = family.filter(m => areSiblings(spouse, m) && m.gender === "female");
             for (let ws of wifeSisters) {
               if (ws.spouseId === targetId) return "తోడల్లుడు (Todalludu)";
             }
           }
-          // Husband's Brother's Wife -> తోడికోడలు (Todikodalu)
           if (focus.gender === "female") {
             const husbandBrothers = family.filter(m => areSiblings(spouse, m) && m.gender === "male");
             for (let hb of husbandBrothers) {
@@ -535,26 +571,22 @@
         }
       }
 
-      // 8. Maternal Relations (Mother's Side)
+      // 8. Maternal Relations
       if (focusMother) {
-        // Mother's Brother -> మేనమామ / మామయ్య
         if (areSiblings(focusMother, target) && target.gender === "male") {
           return "మామయ్య / మేనమామ (Mamayya / Menamama)";
         }
-        // Mother's Brother's Wife -> అత్త / అత్తయ్య
         const motherBrothers = family.filter(m => areSiblings(focusMother, m) && m.gender === "male");
         for (let mb of motherBrothers) {
           if (mb.spouseId === targetId) return "అత్త / అత్తయ్య (Attha / Atthayya)";
         }
 
-        // Mother's Sister -> పెద్దమ్మ / పిన్ని
         if (areSiblings(focusMother, target) && target.gender === "female") {
           return isTargetOlderThan(focusMother) 
             ? "పెద్దమ్మ / దొడ్డమ్మ (Peddamma / Doddamma)" 
             : "చిన్నమ్మ / పిన్ని (Chinnamma / Pinni)";
         }
 
-        // Mother's Sister's Husband -> బాబాయ్ / పెద్దనాన్న
         const motherSisters = family.filter(m => areSiblings(focusMother, m) && m.gender === "female");
         for (let ms of motherSisters) {
           if (ms.spouseId === targetId) {
@@ -565,26 +597,22 @@
         }
       }
 
-      // 9. Paternal Relations (Father's Side)
+      // 9. Paternal Relations
       if (focusFather) {
-        // Father's Sister -> మేనత్త / అత్తయ్య
         if (areSiblings(focusFather, target) && target.gender === "female") {
           return "మేనత్త / అత్తయ్య (Menattha / Atthayya)";
         }
-        // Father's Sister's Husband -> మామయ్య
         const fatherSisters = family.filter(m => areSiblings(focusFather, m) && m.gender === "female");
         for (let fs of fatherSisters) {
           if (fs.spouseId === targetId) return "మామయ్య (Mamayya)";
         }
 
-        // Father's Brother -> పెద్దనాన్న / బాబాయ్
         if (areSiblings(focusFather, target) && target.gender === "male") {
           return isTargetOlderThan(focusFather) 
             ? "పెద్దనాన్న / పెద్దనాయన (Peddananna)" 
             : "బాబాయ్ / చిన్నాయన (Babai / Chinnaayana)";
         }
 
-        // Father's Brother's Wife -> పెద్దమ్మ / పిన్ని
         const fatherBrothers = family.filter(m => areSiblings(focusFather, m) && m.gender === "male");
         for (let fb of fatherBrothers) {
           if (fb.spouseId === targetId) {
@@ -600,11 +628,9 @@
         const mySiblings = family.filter(m => m.id !== focus.id && (m.parentIds || []).includes(fp.id));
         for (let sib of mySiblings) {
           if ((target.parentIds || []).includes(sib.id)) {
-            // Cross-sex sibling's child (Menalludu / Menakodalu)
             if ((focus.gender === "male" && sib.gender === "female") || (focus.gender === "female" && sib.gender === "male")) {
               return target.gender === "female" ? "మేనకోడలు (Menakodalu)" : "మేనల్లుడు (Menalludu)";
             }
-            // Same-sex sibling's child (Treated as Son / Daughter)
             return target.gender === "female" ? "కూతురు (Kooturu)" : "కొడుకు (Koduku)";
           }
         }
@@ -615,7 +641,6 @@
         if ((target.parentIds || []).includes(child.id)) {
           return target.gender === "female" ? "మనవరాలు (Manavaralu)" : "మనవడు (Manavadu)";
         }
-        // Great Grandchildren
         const grandChildren = family.filter(m => (m.parentIds || []).includes(child.id));
         for (let gc of grandChildren) {
           if ((target.parentIds || []).includes(gc.id)) {
@@ -624,7 +649,6 @@
         }
       }
 
-      // Grandparents
       if (focusFather && (focusFather.parentIds || []).includes(targetId)) {
         return target.gender === "female" ? "నానమ్మ / బామ్మ (Nanamma / Baamma)" : "తాత / తాతయ్య (Taata / Taathayya)";
       }
@@ -632,7 +656,6 @@
         return target.gender === "female" ? "అమ్మమ్మ (Ammamma)" : "తాతగారు / తాతయ్య (Taatayya)";
       }
 
-      // Great Grandparents
       if (focusFather) {
         const fParents = (focusFather.parentIds || []).map(id => family.find(m => m.id === id)).filter(Boolean);
         for (let gp of fParents) {
@@ -796,26 +819,30 @@
           return `
             <div class="bg-white border ${focusPersonId === m.id || (spouse && focusPersonId === spouse.id) ? 'border-blue-500 ring-2 ring-blue-300' : 'border-slate-200'} rounded-2xl shadow-sm hover:shadow-md transition p-3 flex flex-col justify-between h-full">
               <div class="flex items-start justify-between gap-2">
+                <!-- Husband / Primary Member -->
                 <div class="flex items-start gap-2 p-1 rounded-xl transition ${!isSpouseActive ? 'bg-blue-50/70 ring-1 ring-blue-300' : 'opacity-70 hover:opacity-100'}" onclick="setFocusPerson('${m.id}')">
                   <div class="w-8 h-8 rounded-full ${m.gender === 'female' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'} flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
                     ${m.name.charAt(0)}
                   </div>
                   <div>
                     <div class="flex items-center gap-1">
-                      <h4 class="font-bold text-slate-800 text-xs truncate max-w-[95px]">${m.name}</h4>
-                      <button onclick="event.stopPropagation(); openEditModal('${m.id}')" class="text-slate-400 hover:text-blue-600 text-[10px]">✏️</button>
+                      <h4 class="font-bold text-slate-800 text-xs truncate max-w-[85px]">${m.name}</h4>
+                      <button onclick="event.stopPropagation(); openEditModal('${m.id}')" class="text-slate-400 hover:text-blue-600 text-[10px]" title="Edit">✏️</button>
+                      <button onclick="event.stopPropagation(); deleteMember('${m.id}')" class="text-slate-400 hover:text-rose-600 text-[10px]" title="Delete Person">🗑️</button>
                     </div>
                     <p class="text-[10px] text-blue-600 font-semibold leading-tight">${relationM}</p>
                     <p class="text-[9px] text-slate-400">${mAge !== "" ? `Age: ${mAge}y` : (m.dob || 'DOB —')}</p>
                   </div>
                 </div>
 
+                <!-- Wife / Spouse Member -->
                 ${spouse ? `
                   <div class="flex items-start gap-2 p-1 rounded-xl transition border-l pl-2 border-slate-200 ${isSpouseActive ? 'bg-rose-50/70 ring-1 ring-rose-300' : 'opacity-70 hover:opacity-100'}" onclick="event.stopPropagation(); setFocusPerson('${spouse.id}')">
                     <div class="text-right">
                       <div class="flex items-center justify-end gap-1">
-                        <button onclick="event.stopPropagation(); openEditModal('${spouse.id}')" class="text-slate-400 hover:text-blue-600 text-[10px]">✏️</button>
-                        <h4 class="font-bold text-slate-800 text-xs truncate max-w-[85px]">${spouse.name}</h4>
+                        <button onclick="event.stopPropagation(); deleteMember('${spouse.id}')" class="text-slate-400 hover:text-rose-600 text-[10px]" title="Delete Person">🗑️</button>
+                        <button onclick="event.stopPropagation(); openEditModal('${spouse.id}')" class="text-slate-400 hover:text-blue-600 text-[10px]" title="Edit">✏️</button>
+                        <h4 class="font-bold text-slate-800 text-xs truncate max-w-[80px]">${spouse.name}</h4>
                       </div>
                       <p class="text-[9px] text-rose-500 font-semibold leading-tight">${relationSpouse}</p>
                       <p class="text-[8px] text-slate-400">${spouseAge !== "" ? `Age: ${spouseAge}y` : (spouse.dob || 'DOB —')}</p>
