@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Telugu Family Tree</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .node-card { cursor: pointer; }
+    .link-line { fill: none; stroke: #94a3b8; stroke-width: 2px; }
+  </style>
+</head>
+<body class="bg-slate-50 relative">
+
+  <!-- Top Navigation & Controls -->
+  <header class="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+    
+    <!-- Left: Main Head & Focus Context -->
+    <div class="pointer-events-auto flex items-center gap-3 bg-white/95 backdrop-blur border border-slate-200 shadow-sm rounded-xl p-2 px-4">
+      <span class="text-2xl">🌳</span>
+      <div class="flex items-center gap-2 border-r border-slate-200 pr-3">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Main Family Head</label>
+          <div class="flex items-center gap-1.5 mt-0.5">
+            <input id="mainPersonInput" type="text" placeholder="Enter root name..." class="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 font-semibold focus:outline-blue-500 w-36">
+            <button onclick="saveMainPersonName()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-2.5 py-1 rounded-lg transition shadow-sm">Save</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Viewing Relations As</p>
+        <p class="text-xs text-blue-600 font-bold" id="focusStatus">Loading...</p>
+      </div>
+    </div>
+
+    <!-- Center: Search Bar -->
+    <div class="pointer-events-auto flex items-center bg-white/95 backdrop-blur border border-slate-200 shadow-sm rounded-xl px-3 py-2 w-56 md:w-64">
+      <span class="text-slate-400 mr-2 text-sm">🔍</span>
+      <input id="searchInput" type="text" placeholder="Search relative..." class="w-full bg-transparent text-xs md:text-sm focus:outline-none text-slate-800 placeholder-slate-400" oninput="handleSearch(this.value)">
+    </div>
+
+    <!-- Right: Sharing & Actions -->
+    <div class="pointer-events-auto flex items-center gap-2">
+      <!-- One-Click Instant Share Link -->
+      <button onclick="shareLinkToBrother()" class="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm text-xs md:text-sm px-3 py-2 rounded-xl transition flex items-center gap-1.5 font-semibold">
+        <span>🔗</span> Share Link
+      </button>
+
+      <!-- Cloud Sync & Backup Options -->
+      <button onclick="toggleCloudModal()" class="bg-white/95 hover:bg-slate-100 border border-slate-200 text-slate-700 shadow-sm text-xs md:text-sm px-3 py-2 rounded-xl transition flex items-center gap-1.5 font-medium">
+        <span>☁️</span> Cloud / Sync
+      </button>
+
+      <button onclick="toggleEventsPanel()" class="bg-white/95 hover:bg-slate-100 border border-slate-200 text-slate-700 shadow-sm text-xs md:text-sm px-3 py-2 rounded-xl transition flex items-center gap-1.5 font-medium">
+        <span>🎉</span> Events
+      </button>
+      <button onclick="resetZoom()" class="bg-white/95 hover:bg-slate-100 border border-slate-200 text-slate-700 shadow-sm text-xs md:text-sm px-3 py-2 rounded-xl transition font-medium">Fit View</button>
+      <button onclick="clearStorageAndReset()" class="bg-white/95 hover:bg-rose-50 border border-slate-200 text-rose-600 shadow-sm text-xs px-2.5 py-2 rounded-xl transition font-medium">Reset</button>
+    </div>
+  </header>
+
+  <!-- Side Events Drawer -->
+  <div id="eventsDrawer" class="hidden absolute top-20 right-4 z-20 w-80 bg-white border border-slate-200 shadow-2xl rounded-2xl p-4 transition-all">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="font-bold text-slate-800 text-sm">Upcoming Milestones (30 Days)</h2>
+      <button onclick="toggleEventsPanel()" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+    </div>
+    <div id="eventsList" class="space-y-2 text-xs text-slate-600 max-h-80 overflow-y-auto"></div>
+  </div>
+
+  <!-- Cloud Sync & Import/Export Modal -->
+  <div id="cloudModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-slate-100">
+      <button onclick="toggleCloudModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">✕</button>
+      <h3 class="font-bold text-slate-800 text-base mb-1">Family Sync & Backup</h3>
+      <p class="text-xs text-slate-500 mb-4">Share with family without re-entering relationships.</p>
+
+      <!-- Option 1: Live Cloud Room Key -->
+      <div class="mb-5 p-3.5 bg-blue-50/60 border border-blue-100 rounded-xl">
+        <h4 class="text-xs font-bold text-blue-900 mb-1">Method 1: Live Family Room Sync</h4>
+        <p class="text-[11px] text-slate-600 mb-2">Use a shared family name. Both you and your brother type the same room name to edit the exact same tree live.</p>
+        <div class="flex items-center gap-2">
+          <input id="cloudRoomKey" type="text" placeholder="e.g. sharma-family-hyd" class="w-full border border-blue-200 rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-blue-500">
+          <button onclick="saveToCloudRoom()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg shrink-0">Upload</button>
+          <button onclick="loadFromCloudRoom()" class="bg-slate-700 hover:bg-slate-800 text-white font-semibold text-xs px-3 py-1.5 rounded-lg shrink-0">Fetch</button>
+        </div>
+      </div>
+
+      <!-- Option 2: File Import / Export Backup -->
+      <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+        <h4 class="text-xs font-bold text-slate-800 mb-1">Method 2: One-Time Backup File</h4>
+        <p class="text-[11px] text-slate-500 mb-3">Download a file or restore from a previous file.</p>
+        <div class="flex items-center gap-2">
+          <button onclick="exportFamilyJson()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">Download File (.json)</button>
+          <label class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer">
+            Upload File
+            <input type="file" accept=".json" onchange="importFamilyJson(event)" class="hidden">
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Canvas -->
+  <svg id="treeCanvas" class="w-full h-full"></svg>
+
+  <!-- Add Relative Modal -->
+  <div id="addModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 relative border border-slate-100">
+      <button onclick="closeModal('addModal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">✕</button>
+      <h3 id="modalTitle" class="font-bold text-slate-800 text-base mb-0.5">Add Relative</h3>
+      <p id="modalSubtitle" class="text-xs text-slate-500 mb-4">Enter details below</p>
+      
+      <form id="memberForm" onsubmit="handleFormSubmit(event)" class="space-y-3">
+        <input type="hidden" id="formTargetId" value="">
+        <input type="hidden" id="formRelationType" value="">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Full Name *</label>
+          <input type="text" id="formFullName" required placeholder="Full Name" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Gender *</label>
+          <select id="formGender" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-blue-500">
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Birth Date</label>
+            <input type="date" id="formDob" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-blue-500" oninput="syncDobToAge('formDob', 'formAge')">
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Age (Years)</label>
+            <input type="number" id="formAge" min="0" max="130" placeholder="e.g. 25" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-blue-500" oninput="syncAgeToDob('formAge', 'formDob')">
+          </div>
+        </div>
+
+        <div id="anniversaryGroup" class="hidden">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Anniversary Date</label>
+          <input type="date" id="formAnniversary" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-blue-500">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3">
+          <button type="button" onclick="closeModal('addModal')" class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm">Save & Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Member Modal -->
+  <div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 relative border border-slate-100">
+      <button onclick="closeModal('editModal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">✕</button>
+      <h3 class="font-bold text-slate-800 text-base mb-0.5">Edit Member Details</h3>
+      <p class="text-xs text-slate-500 mb-4">Update details</p>
+      
+      <form id="editForm" onsubmit="handleEditFormSubmit(event)" class="space-y-3">
+        <input type="hidden" id="editMemberId" value="">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Full Name *</label>
+          <input type="text" id="editFullName" required placeholder="Full Name" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Gender *</label>
+          <select id="editGender" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-blue-500">
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Birth Date</label>
+            <input type="date" id="editDob" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-blue-500" oninput="syncDobToAge('editDob', 'editAge')">
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Age (Years)</label>
+            <input type="number" id="editAge" min="0" max="130" placeholder="e.g. 25" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-blue-500" oninput="syncAgeToDob('editAge', 'editDob')">
+          </div>
+        </div>
+
+        <div id="editAnniversaryGroup">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Anniversary Date</label>
+          <input type="date" id="editAnniversary" class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-blue-500">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3">
+          <button type="button" onclick="closeModal('editModal')" class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "dynamic_family_tree_dual_v7";
+    const FOCUS_KEY = "dynamic_family_tree_focus_v7";
+    const CLOUD_ROOM_KEY = "dynamic_family_tree_cloud_room";
+
+    const defaultFamily = [
+      { id: "1", name: "laxman", gender: "male", dob: "1962-01-01", spouseId: "2", anniversary: "1985-05-18", parentIds: [] },
+      { id: "2", name: "kalavathi", gender: "female", dob: "1970-01-01", spouseId: "1", anniversary: "1985-05-18", parentIds: [] }
+    ];
+
+    let family = loadInitialFamily();
+    let focusPersonId = localStorage.getItem(FOCUS_KEY) || family[0]?.id || "1";
+
+    // Detect if URL contains shared tree data from WhatsApp/Link
+    function loadInitialFamily() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const dataParam = urlParams.get("data");
+      if (dataParam) {
+        try {
+          const decoded = JSON.parse(decodeURIComponent(escape(atob(dataParam))));
+          if (Array.isArray(decoded) && decoded.length > 0) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(decoded));
+            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+            return decoded;
+          }
+        } catch (e) {
+          console.error("Could not parse shared link data", e);
+        }
+      }
+
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+      return defaultFamily;
+    }
+
+    function persistFamilyData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(family));
+      localStorage.setItem(FOCUS_KEY, focusPersonId);
+    }
+
+    // 1. WhatsApp / Direct Link Share
+    function shareLinkToBrother() {
+      try {
+        const jsonStr = JSON.stringify(family);
+        const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+        const shareUrl = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
+        
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          alert(`Link copied to clipboard!\n\nSend this link to your brother via WhatsApp or Message. When he clicks it, your full ${family.length}-member tree will open directly on his phone.`);
+        }).catch(() => {
+          prompt("Copy this link and send to your brother:", shareUrl);
+        });
+      } catch (err) {
+        alert("Tree is large; please use the Cloud Room or Export JSON option.");
+      }
+    }
+
+    // 2. Cloud Room Sync (Using Key-Value Cloud Storage API)
+    async function saveToCloudRoom() {
+      const room = document.getElementById("cloudRoomKey").value.trim();
+      if (!room) { alert("Please enter a room name (e.g. sharma-family)"); return; }
+      localStorage.setItem(CLOUD_ROOM_KEY, room);
+
+      try {
+        const res = await fetch(`https://api.keyval.org/set/${encodeURIComponent(room)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(family)
+        });
+        if (res.ok) {
+          alert(`Tree successfully uploaded to cloud room: "${room}".\n\nYour brother just needs to open this app, click Cloud Sync, enter "${room}", and click Fetch.`);
+        }
+      } catch (e) {
+        alert("Upload failed. Check your internet connection.");
+      }
+    }
+
+    async function loadFromCloudRoom() {
+      const room = document.getElementById("cloudRoomKey").value.trim();
+      if (!room) { alert("Please enter the room name"); return; }
+      localStorage.setItem(CLOUD_ROOM_KEY, room);
+
+      try {
+        const res = await fetch(`https://api.keyval.org/get/${encodeURIComponent(room)}`);
+        if (res.ok) {
+          const cloudData = await res.json();
+          if (Array.isArray(cloudData) && cloudData.length > 0) {
+            family = cloudData;
+            focusPersonId = family[0].id;
+            persistFamilyData();
+            renderTree();
+            updateHeaderInputs();
+            toggleCloudModal();
+            alert(`Loaded ${family.length} members from cloud room "${room}"!`);
+          }
+        } else {
+          alert(`Room "${room}" not found. Ensure the uploader has clicked Upload first.`);
+        }
+      } catch (e) {
+        alert("Could not connect to cloud sync.");
+      }
+    }
+
+    // 3. File Export & Import
+    function exportFamilyJson() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(family, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `family_tree_backup.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importFamilyJson(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (Array.isArray(imported)) {
+            family = imported;
+            focusPersonId = family[0].id;
+            persistFamilyData();
+            renderTree();
+            updateHeaderInputs();
+            toggleCloudModal();
+            alert("Family tree imported successfully!");
+          }
+        } catch (err) {
+          alert("Invalid backup JSON file.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function toggleCloudModal() {
+      const m = document.getElementById("cloudModal");
+      m.classList.toggle("hidden");
+      const savedRoom = localStorage.getItem(CLOUD_ROOM_KEY);
+      if (savedRoom) document.getElementById("cloudRoomKey").value = savedRoom;
+    }
+
+    function clearStorageAndReset() {
+      if (confirm("Reset tree to initial pair? All custom additions will be cleared.")) {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(FOCUS_KEY);
+        family = defaultFamily;
+        focusPersonId = family[0].id;
+        renderTree();
+        updateHeaderInputs();
+        resetZoom();
+      }
+    }
+
+    function calculateAgeFromDob(dobStr) {
+      if (!dobStr) return "";
+      const birth = new Date(dobStr);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const monthDiff = today.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      return age >= 0 ? age : 0;
+    }
+
+    function syncDobToAge(dobInputId, ageInputId) {
+      const dobVal = document.getElementById(dobInputId).value;
+      const ageInput = document.getElementById(ageInputId);
+      if (!dobVal) { ageInput.value = ""; return; }
+      ageInput.value = calculateAgeFromDob(dobVal);
+    }
+
+    function syncAgeToDob(ageInputId, dobInputId) {
+      const ageVal = parseInt(document.getElementById(ageInputId).value, 10);
+      const dobInput = document.getElementById(dobInputId);
+      if (isNaN(ageVal) || ageVal < 0) { dobInput.value = ""; return; }
+      const currentYear = new Date().getFullYear();
+      const birthYear = currentYear - ageVal;
+      dobInput.value = `${birthYear}-01-01`;
+    }
+
+    const svg = d3.select("#treeCanvas");
+    const container = svg.append("g");
+    const zoom = d3.zoom().scaleExtent([0.2, 2.5]).on("zoom", (e) => container.attr("transform", e.transform));
+    svg.call(zoom);
+
+    function getRootPerson() {
+      return family.find(d => (d.parentIds || []).length === 0 && (!d.spouseId || d.gender === "male" || !family.find(m => m.id === d.spouseId))) || family[0];
+    }
+
+    function updateHeaderInputs() {
+      const root = getRootPerson();
+      if (root) {
+        document.getElementById("mainPersonInput").value = root.name;
+      }
+      const focus = family.find(m => m.id === focusPersonId) || root;
+      if (focus) {
+        document.getElementById("focusStatus").innerText = focus.name;
+      }
+    }
+
+    function saveMainPersonName() {
+      const input = document.getElementById("mainPersonInput").value.trim();
+      if (!input) return;
+      const root = getRootPerson();
+      if (root) {
+        root.name = input;
+        persistFamilyData();
+        renderTree();
+        updateHeaderInputs();
+      }
+    }
+
+    // Kinship Engine
+    function computeKinship(targetId) {
+      if (targetId === focusPersonId) return "You (నేను)";
+
+      const focus = family.find(m => m.id === focusPersonId);
+      const target = family.find(m => m.id === targetId);
+      if (!focus || !target) return "";
+
+      const focusParents = (focus.parentIds || []).map(id => family.find(m => m.id === id)).filter(Boolean);
+      const targetParents = (target.parentIds || []).map(id => family.find(m => m.id === id)).filter(Boolean);
+
+      const focusFather = focusParents.find(p => p.gender === "male");
+      const focusMother = focusParents.find(p => p.gender === "female");
+
+      const isTargetOlderThan = (person) => {
+        if (!target.dob || !person.dob) return false;
+        return new Date(target.dob) < new Date(person.dob);
+      };
+
+      // 1. Spouse
+      if (focus.spouseId === targetId) {
+        return target.gender === "female" ? "Bharya / Wife (భార్య)" : "Bartha / Husband (భర్త)";
+      }
+
+      // 2. Direct Parents
+      if (focus.parentIds && focus.parentIds.includes(targetId)) {
+        return target.gender === "female" ? "Amma (అమ్మ)" : "Nanna (నాన్న)";
+      }
+
+      // 3. Direct Children
+      if (target.parentIds && (target.parentIds.includes(focusPersonId) || (focus.spouseId && target.parentIds.includes(focus.spouseId)))) {
+        return target.gender === "female" ? "Kuturu (కూతురు)" : "Koduku (కొడుకు)";
+      }
+
+      // 4. Siblings
+      const sharedParents = focusParents.filter(fp => targetParents.some(tp => tp.id === fp.id));
+      if (sharedParents.length > 0) {
+        const isOlder = isTargetOlderThan(focus);
+        if (target.gender === "male") {
+          return isOlder ? "Anna / Annayya (అన్న / అన్నయ్య)" : "Tammudu (తమ్ముడు)";
+        } else {
+          return isOlder ? "Akka (అక్క)" : "Chelli / Chellalu (చెల్లి / చెల్లెలు)";
+        }
+      }
+
+      // 5. In-Laws (Transitive)
+      const focusChildren = family.filter(m => (m.parentIds || []).includes(focusPersonId) || (focus.spouseId && (m.parentIds || []).includes(focus.spouseId)));
+      for (let child of focusChildren) {
+        if (child.spouseId === targetId) {
+          return target.gender === "female" ? "Kodalu (కోడలు)" : "Alludu (అల్లుడు)";
+        }
+      }
+
+      if (focus.spouseId) {
+        const spouse = family.find(m => m.id === focus.spouseId);
+        if (spouse && (spouse.parentIds || []).includes(targetId)) {
+          return target.gender === "female" ? "Atta / Attagaru (అత్త / అత్తగారు)" : "Mavagaru / Mama (మామగారు / మామ)";
+        }
+        if (spouse) {
+          const spouseParents = (spouse.parentIds || []).map(id => family.find(m => m.id === id)).filter(Boolean);
+          const isSpouseSibling = spouseParents.some(sp => (target.parentIds || []).includes(sp.id));
+          if (isSpouseSibling) {
+            if (target.gender === "male") {
+              return isTargetOlderThan(spouse) ? "Bava (బావ)" : "Maridi (మరిది)";
+            } else {
+              return "Vadina (వదిన)";
+            }
+          }
+        }
+      }
+
+      for (let fp of focusParents) {
+        const mySiblings = family.filter(m => m.id !== focus.id && (m.parentIds || []).includes(fp.id));
+        for (let sib of mySiblings) {
+          if (sib.spouseId === targetId) {
+            if (target.gender === "female") return "Vadina (వదిన)";
+            return isTargetOlderThan(focus) ? "Bava (బావ)" : "Maridi (మరిది)";
+          }
+        }
+      }
+
+      // 6. Grandparents & Grandchildren
+      for (let child of focusChildren) {
+        if ((target.parentIds || []).includes(child.id)) {
+          return target.gender === "female" ? "Manavaralu (మనవరాలు)" : "Manavadu (మనవడు)";
+        }
+      }
+
+      if (focusFather && (focusFather.parentIds || []).includes(targetId)) {
+        return target.gender === "female" ? "Nannamma / Mamma (నానమ్మ / మామ్మ)" : "Tata / Tatayya (తాత / తాతయ్య)";
+      }
+      if (focusMother && (focusMother.parentIds || []).includes(targetId)) {
+        return target.gender === "female" ? "Ammamma (అమ్మమ్మ)" : "Tata / Tatayya (తాత / తాతయ్య)";
+      }
+
+      // 7. Paternal Uncles & Aunts
+      if (focusFather) {
+        const fatherParents = focusFather.parentIds || [];
+        const isFatherSibling = fatherParents.some(pid => (target.parentIds || []).includes(pid));
+        if (isFatherSibling) {
+          if (target.gender === "male") {
+            return isTargetOlderThan(focusFather) ? "Peddananna (పెద్దనాన్న)" : "Chinnanna / Babai (చిన్ననాన్న / బాబాయ్)";
+          } else {
+            return "Atta / Attayya (అత్త / అత్తయ్య)";
+          }
+        }
+      }
+
+      // 8. Maternal Uncles & Aunts
+      if (focusMother) {
+        const motherParents = focusMother.parentIds || [];
+        const isMotherSibling = motherParents.some(pid => (target.parentIds || []).includes(pid));
+        if (isMotherSibling) {
+          if (target.gender === "female") {
+            return isTargetOlderThan(focusMother) ? "Doddamma (పెద్దమ్మ / దొడ్డమ్మ)" : "Pinni (పిన్ని)";
+          } else {
+            return "Mama / Mamayya (మామ / మామయ్య)";
+          }
+        }
+      }
+
+      return "Relative (చుట్టం)";
+    }
+
+    function setFocusPerson(id) {
+      focusPersonId = id;
+      persistFamilyData();
+      updateHeaderInputs();
+      renderTree();
+    }
+
+    function buildGraphLayout(data) {
+      const cardMap = new Map();
+      const visited = new Set();
+      const units = [];
+
+      data.forEach(m => {
+        if (visited.has(m.id)) return;
+        const spouse = m.spouseId ? data.find(x => x.id === m.spouseId) : null;
+        const primary = (spouse && m.gender === "female" && spouse.gender === "male") ? spouse : m;
+        const secondary = primary === m ? spouse : m;
+
+        const card = {
+          id: `card_${primary.id}`,
+          primary,
+          secondary,
+          children: []
+        };
+        cardMap.set(primary.id, card);
+        if (secondary) cardMap.set(secondary.id, card);
+        units.push(card);
+
+        visited.add(primary.id);
+        if (secondary) visited.add(secondary.id);
+      });
+
+      const genMap = new Map();
+      function getGen(mId, visitedTrace = new Set()) {
+        if (visitedTrace.has(mId)) return 0;
+        visitedTrace.add(mId);
+        const m = data.find(x => x.id === mId);
+        if (!m || !m.parentIds || m.parentIds.length === 0) return 0;
+        const parentGens = m.parentIds.map(p => getGen(p, new Set(visitedTrace)));
+        return Math.max(...parentGens) + 1;
+      }
+
+      units.forEach(u => {
+        const g1 = getGen(u.primary.id);
+        const g2 = u.secondary ? getGen(u.secondary.id) : 0;
+        genMap.set(u.id, Math.max(g1, g2));
+      });
+
+      const genBuckets = new Map();
+      units.forEach(u => {
+        const g = genMap.get(u.id) || 0;
+        if (!genBuckets.has(g)) genBuckets.set(g, []);
+        genBuckets.get(g).push(u);
+      });
+
+      const cardsWithPos = [];
+      const CARD_WIDTH = 350;
+      const X_GAP = 60;
+      const Y_GAP = 270;
+
+      genBuckets.forEach((cardsInGen, g) => {
+        const totalWidth = cardsInGen.length * CARD_WIDTH + (cardsInGen.length - 1) * X_GAP;
+        const startX = -totalWidth / 2 + CARD_WIDTH / 2;
+        cardsInGen.forEach((card, idx) => {
+          card.x = startX + idx * (CARD_WIDTH + X_GAP);
+          card.y = g * Y_GAP;
+          cardsWithPos.push(card);
+        });
+      });
+
+      const links = [];
+      cardsWithPos.forEach(childCard => {
+        const pParents = childCard.primary.parentIds || [];
+        if (pParents.length > 0) {
+          const parentCard = cardsWithPos.find(c => c.primary.id === pParents[0] || (c.secondary && c.secondary.id === pParents[0]));
+          if (parentCard) {
+            links.push({
+              source: { x: parentCard.x, y: parentCard.y + 190 },
+              target: { x: childCard.x - 60, y: childCard.y - 25 }
+            });
+          }
+        }
+        if (childCard.secondary) {
+          const mParents = childCard.secondary.parentIds || [];
+          if (mParents.length > 0) {
+            const mParentCard = cardsWithPos.find(c => c.primary.id === mParents[0] || (c.secondary && c.secondary.id === mParents[0]));
+            if (mParentCard) {
+              links.push({
+                source: { x: mParentCard.x, y: mParentCard.y + 190 },
+                target: { x: childCard.x + 60, y: childCard.y - 25 }
+              });
+            }
+          }
+        }
+      });
+
+      return { cards: cardsWithPos, links };
+    }
+
+    function renderTree() {
+      container.selectAll("*").remove();
+      const { cards, links } = buildGraphLayout(family);
+
+      container.selectAll(".link")
+        .data(links)
+        .enter()
+        .append("path")
+        .attr("class", "link-line")
+        .attr("d", d3.linkVertical().x(d => d.x).y(d => d.y));
+
+      const nodes = container.selectAll(".node")
+        .data(cards)
+        .enter()
+        .append("g")
+        .attr("class", "node-card")
+        .attr("transform", d => `translate(${d.x},${d.y})`);
+
+      nodes.append("foreignObject")
+        .attr("width", 350)
+        .attr("height", 215)
+        .attr("x", -175)
+        .attr("y", -30)
+        .html(d => {
+          const m = d.primary;
+          const spouse = d.secondary;
+
+          const isSpouseActive = spouse && focusPersonId === spouse.id;
+          const activePerson = isSpouseActive ? spouse : m;
+          const activePersonId = activePerson.id;
+
+          const relationM = computeKinship(m.id);
+          const relationSpouse = spouse ? computeKinship(spouse.id) : "";
+          const mAge = calculateAgeFromDob(m.dob);
+          const spouseAge = spouse ? calculateAgeFromDob(spouse.dob) : "";
+
+          const activeAge = calculateAgeFromDob(activePerson.dob);
+          const isChild = (activeAge !== "" && activeAge < 18);
+          const hasFather = (activePerson.parentIds || []).some(pid => family.find(x => x.id === pid)?.gender === "male");
+          const hasMother = (activePerson.parentIds || []).some(pid => family.find(x => x.id === pid)?.gender === "female");
+
+          return `
+            <div class="bg-white border ${focusPersonId === m.id || (spouse && focusPersonId === spouse.id) ? 'border-blue-500 ring-2 ring-blue-300' : 'border-slate-200'} rounded-2xl shadow-sm hover:shadow-md transition p-3 flex flex-col justify-between h-full">
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-start gap-2 p-1 rounded-xl transition ${!isSpouseActive ? 'bg-blue-50/70 ring-1 ring-blue-300' : 'opacity-70 hover:opacity-100'}" onclick="setFocusPerson('${m.id}')">
+                  <div class="w-8 h-8 rounded-full ${m.gender === 'female' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'} flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                    ${m.name.charAt(0)}
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-1">
+                      <h4 class="font-bold text-slate-800 text-xs truncate max-w-[95px]">${m.name}</h4>
+                      <button onclick="event.stopPropagation(); openEditModal('${m.id}')" class="text-slate-400 hover:text-blue-600 text-[10px]">✏️</button>
+                    </div>
+                    <p class="text-[10px] text-blue-600 font-semibold leading-tight">${relationM}</p>
+                    <p class="text-[9px] text-slate-400">${mAge !== "" ? `Age: ${mAge}y` : (m.dob || 'DOB —')}</p>
+                  </div>
+                </div>
+
+                ${spouse ? `
+                  <div class="flex items-start gap-2 p-1 rounded-xl transition border-l pl-2 border-slate-200 ${isSpouseActive ? 'bg-rose-50/70 ring-1 ring-rose-300' : 'opacity-70 hover:opacity-100'}" onclick="event.stopPropagation(); setFocusPerson('${spouse.id}')">
+                    <div class="text-right">
+                      <div class="flex items-center justify-end gap-1">
+                        <button onclick="event.stopPropagation(); openEditModal('${spouse.id}')" class="text-slate-400 hover:text-blue-600 text-[10px]">✏️</button>
+                        <h4 class="font-bold text-slate-800 text-xs truncate max-w-[85px]">${spouse.name}</h4>
+                      </div>
+                      <p class="text-[9px] text-rose-500 font-semibold leading-tight">${relationSpouse}</p>
+                      <p class="text-[8px] text-slate-400">${spouseAge !== "" ? `Age: ${spouseAge}y` : (spouse.dob || 'DOB —')}</p>
+                    </div>
+                    <div class="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                      ${spouse.name.charAt(0)}
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+
+              <div class="flex justify-between items-center px-1 text-[9px] text-slate-500 bg-slate-50 py-0.5 rounded border border-slate-100">
+                <span>Actions for: <strong class="text-slate-700">${activePerson.name}</strong></span>
+                <span class="text-[8px] text-slate-400 font-normal">(Click partner above to switch)</span>
+              </div>
+
+              <div class="grid grid-cols-4 gap-1 pt-1 text-[9px] font-semibold text-slate-700">
+                <button onclick="openAddModal('${activePersonId}', 'father')" class="bg-slate-50 hover:bg-blue-50 hover:text-blue-600 py-1 rounded border border-slate-100 transition text-center ${hasFather ? 'opacity-30 pointer-events-none' : ''}">+ Nanna</button>
+                <button onclick="openAddModal('${activePersonId}', 'mother')" class="bg-slate-50 hover:bg-rose-50 hover:text-rose-600 py-1 rounded border border-slate-100 transition text-center ${hasMother ? 'opacity-30 pointer-events-none' : ''}">+ Amma</button>
+                <button onclick="openAddModal('${activePersonId}', 'spouse')" class="bg-slate-50 hover:bg-purple-50 hover:text-purple-600 py-1 rounded border border-slate-100 transition text-center ${spouse || isChild ? 'hidden' : ''}">+ Spouse</button>
+                <button onclick="openAddModal('${activePersonId}', 'child')" class="bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 py-1 rounded border border-slate-100 transition text-center ${isChild ? 'col-span-2' : ''}">+ Child</button>
+              </div>
+
+              <div class="grid grid-cols-2 gap-1 text-[9px] font-semibold text-slate-700">
+                <button onclick="openAddModal('${activePersonId}', 'brother')" class="bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 py-1 rounded border border-slate-100 transition text-center flex items-center justify-center gap-1">
+                  <span>+ Brother</span> <span class="text-[8px] text-slate-400">(అన్న/తమ్ముడు)</span>
+                </button>
+                <button onclick="openAddModal('${activePersonId}', 'sister')" class="bg-slate-50 hover:bg-pink-50 hover:text-pink-600 py-1 rounded border border-slate-100 transition text-center flex items-center justify-center gap-1">
+                  <span>+ Sister</span> <span class="text-[8px] text-slate-400">(అక్క/చెల్లి)</span>
+                </button>
+              </div>
+            </div>
+          `;
+        });
+
+      updateEventsList();
+    }
+
+    function openEditModal(memberId) {
+      const member = family.find(m => m.id === memberId);
+      if (!member) return;
+
+      document.getElementById("editMemberId").value = member.id;
+      document.getElementById("editFullName").value = member.name;
+      document.getElementById("editGender").value = member.gender || "male";
+      document.getElementById("editDob").value = member.dob || "";
+      document.getElementById("editAge").value = calculateAgeFromDob(member.dob);
+      document.getElementById("editAnniversary").value = member.anniversary || "";
+
+      document.getElementById("editAnniversaryGroup").classList.toggle("hidden", !member.spouseId);
+      document.getElementById("editModal").classList.remove("hidden");
+    }
+
+    function handleEditFormSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById("editMemberId").value;
+      const member = family.find(m => m.id === id);
+      if (!member) return;
+
+      member.name = document.getElementById("editFullName").value.trim();
+      member.gender = document.getElementById("editGender").value;
+      member.dob = document.getElementById("editDob").value || null;
+
+      const anniversary = document.getElementById("editAnniversary").value || null;
+      member.anniversary = anniversary;
+
+      if (member.spouseId) {
+        const spouse = family.find(s => s.id === member.spouseId);
+        if (spouse) spouse.anniversary = anniversary;
+      }
+
+      persistFamilyData();
+      closeModal("editModal");
+      renderTree();
+      updateHeaderInputs();
+    }
+
+    function openAddModal(targetId, type) {
+      document.getElementById("formTargetId").value = targetId;
+      document.getElementById("formRelationType").value = type;
+
+      const target = family.find(m => m.id === targetId);
+      const targetName = target ? target.name : "Member";
+
+      const labels = {
+        father: `Add Nanna (Father) for ${targetName}`,
+        mother: `Add Amma (Mother) for ${targetName}`,
+        child: `Add Child for ${targetName}`,
+        spouse: `Add Spouse for ${targetName}`,
+        brother: `Add Brother for ${targetName}`,
+        sister: `Add Sister for ${targetName}`
+      };
+
+      document.getElementById("modalTitle").innerText = labels[type] || "Add Relative";
+      
+      const genderSelect = document.getElementById("formGender");
+      if (type === "father" || type === "brother") genderSelect.value = "male";
+      if (type === "mother" || type === "sister") genderSelect.value = "female";
+
+      document.getElementById("formDob").value = "";
+      document.getElementById("formAge").value = "";
+
+      document.getElementById("anniversaryGroup").classList.toggle("hidden", type !== "spouse");
+      document.getElementById("addModal").classList.remove("hidden");
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.add("hidden");
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      const targetId = document.getElementById("formTargetId").value;
+      const type = document.getElementById("formRelationType").value;
+      const name = document.getElementById("formFullName").value.trim();
+      const gender = document.getElementById("formGender").value;
+      const dob = document.getElementById("formDob").value;
+      const anniversary = document.getElementById("formAnniversary").value;
+
+      const newId = String(Date.now());
+      const newMember = {
+        id: newId,
+        name: name,
+        gender: gender,
+        dob: dob || null,
+        spouseId: null,
+        anniversary: null,
+        parentIds: []
+      };
+
+      const target = family.find(f => f.id === targetId);
+
+      if (type === "child") {
+        newMember.parentIds = target.spouseId ? [target.id, target.spouseId] : [target.id];
+      } else if (type === "spouse") {
+        newMember.spouseId = targetId;
+        newMember.anniversary = anniversary || null;
+        target.spouseId = newId;
+        target.anniversary = anniversary || null;
+      } else if (type === "father" || type === "mother") {
+        if (!target.parentIds) target.parentIds = [];
+        
+        const existingParentId = target.parentIds.find(pid => {
+          const p = family.find(m => m.id === pid);
+          return type === "father" ? p.gender === "female" : p.gender === "male";
+        });
+
+        if (existingParentId) {
+          const existingParent = family.find(m => m.id === existingParentId);
+          newMember.spouseId = existingParentId;
+          existingParent.spouseId = newId;
+        }
+
+        target.parentIds.push(newId);
+      } else if (type === "brother" || type === "sister") {
+        if (target.parentIds && target.parentIds.length > 0) {
+          newMember.parentIds = [...target.parentIds];
+        } else {
+          const parentId = String(Date.now() - 100);
+          const defaultParent = {
+            id: parentId,
+            name: `${target.name}'s Parents`,
+            gender: "male",
+            dob: null,
+            spouseId: null,
+            anniversary: null,
+            parentIds: []
+          };
+          family.push(defaultParent);
+          target.parentIds = [parentId];
+          newMember.parentIds = [parentId];
+        }
+      }
+
+      family.push(newMember);
+      persistFamilyData();
+      closeModal("addModal");
+      document.getElementById("memberForm").reset();
+      renderTree();
+      updateHeaderInputs();
+    }
+
+    function checkUpcoming(dateStr) {
+      if (!dateStr) return false;
+      const today = new Date();
+      const d = new Date(dateStr);
+      d.setFullYear(today.getFullYear());
+      const diff = (d - today) / (1000 * 60 * 60 * 24);
+      return diff >= 0 && diff <= 30;
+    }
+
+    function updateEventsList() {
+      const list = document.getElementById("eventsList");
+      list.innerHTML = "";
+      const events = [];
+
+      family.forEach(m => {
+        if (checkUpcoming(m.dob)) {
+          events.push(`🎂 <strong>${m.name}</strong>'s Birthday (${m.dob.slice(5)})`);
+        }
+        if (m.anniversary && checkUpcoming(m.anniversary)) {
+          const spouse = family.find(s => s.id === m.spouseId);
+          events.push(`💍 <strong>${m.name} & ${spouse ? spouse.name : ''}</strong>'s Anniversary (${m.anniversary.slice(5)})`);
+        }
+      });
+
+      const unique = [...new Set(events)];
+      if (unique.length === 0) {
+        list.innerHTML = `<p class="text-slate-400">No events in the next 30 days.</p>`;
+      } else {
+        unique.forEach(e => {
+          const item = document.createElement("div");
+          item.className = "p-2 bg-slate-50 rounded-lg border border-slate-100";
+          item.innerHTML = e;
+          list.appendChild(item);
+        });
+      }
+    }
+
+    function handleSearch(term) {
+      if (!term.trim()) return;
+      const found = family.find(f => f.name.toLowerCase().includes(term.toLowerCase()));
+      if (found) {
+        setFocusPerson(found.id);
+      }
+    }
+
+    function resetZoom() {
+      svg.transition().duration(750).call(
+        zoom.transform,
+        d3.zoomIdentity.translate(window.innerWidth / 2, 80).scale(0.85)
+      );
+    }
+
+    function toggleEventsPanel() {
+      document.getElementById("eventsDrawer").classList.toggle("hidden");
+    }
+
+    window.onload = () => {
+      updateHeaderInputs();
+      resetZoom();
+      renderTree();
+    };
+  </script>
+</body>
+</html>
