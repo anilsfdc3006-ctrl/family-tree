@@ -1,5 +1,7 @@
+const APP_VERSION = "1.5.0";
 const STORAGE_KEY = "telugu_family_tree_data_v31";
 const FOCUS_KEY = "telugu_family_tree_focus_v31";
+const OPENS_KEY = "telugu_family_tree_open_count";
 const TOKEN_KEY = "telugu_family_tree_github_token";
 const REPO_KEY = "telugu_family_tree_github_repo";
 const IDB_NAME = "telugu_family_tree_db";
@@ -245,6 +247,9 @@ async function initializeApp() {
 
   setupCanvas();
   fillGithubSettingsForm();
+  const ver = document.getElementById("appVersion");
+  if (ver) ver.textContent = "v" + APP_VERSION;
+  document.title = "Family Tree v" + APP_VERSION;
 
   let local = parseRecord(localStorage.getItem(STORAGE_KEY));
   if (!local) local = parseRecord(await idbGet("record"));
@@ -411,17 +416,51 @@ function mergeRemoteVisits(remote) {
   saveLocalVisits(merged);
 }
 
-async function trackOpen() {
-  let total = null;
-  try {
-    const res = await fetch("https://api.counterapi.dev/v1/anilsfdc-family-tree/opens/up", { cache: "no-store" });
-    if (res.ok) {
+function readLocalOpens() {
+  const n = parseInt(localStorage.getItem(OPENS_KEY) || "0", 10);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+function bumpLocalOpens() {
+  const already = sessionStorage.getItem("telugu_family_tree_open_bumped");
+  let n = readLocalOpens();
+  if (!already) {
+    n += 1;
+    localStorage.setItem(OPENS_KEY, String(n));
+    sessionStorage.setItem("telugu_family_tree_open_bumped", "1");
+  }
+  return n;
+}
+
+function setOpenCount(n) {
+  const el = document.getElementById("openCount");
+  if (el) el.textContent = String(n);
+}
+
+async function hitRemoteCounter() {
+  const urls = [
+    "https://abacus.jasoncameron.dev/hit/anilsfdc-family-tree/opens",
+    "https://api.counterapi.dev/v1/anilsfdc-family-tree/opens/up"
+  ];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) continue;
       const data = await res.json();
-      total = data.count ?? data.value ?? null;
-    }
-  } catch (e) { /* counter API optional */ }
-  const opensEl = document.getElementById("openCount");
-  if (opensEl && total != null) opensEl.textContent = String(total);
+      const n = data.value ?? data.count ?? data.Count;
+      if (typeof n === "number" && n >= 0) return n;
+    } catch (e) { /* try next */ }
+  }
+  return null;
+}
+
+async function trackOpen() {
+  const local = bumpLocalOpens();
+  setOpenCount(local);
+  const remote = await hitRemoteCounter();
+  const total = Math.max(local, remote || 0);
+  if (remote && remote > local) localStorage.setItem(OPENS_KEY, String(remote));
+  setOpenCount(total);
   const sessionKey = "telugu_family_tree_checked_in";
   if (!sessionStorage.getItem(sessionKey)) {
     sessionStorage.setItem(sessionKey, "1");
@@ -1308,10 +1347,67 @@ function toggleHeaderMenu() {
   document.getElementById("headerMenu").classList.toggle("hidden");
 }
 
+function printFamilyTree() {
+  const focus = getMember(focusPersonId);
+  ensureKinshipIndex();
+  const byGen = new Map();
+  family.forEach((m) => {
+    const g = m.id === focusPersonId ? 0 : (kinshipIndex.get(m.id)?.gen ?? 0);
+    if (!byGen.has(g)) byGen.set(g, []);
+    byGen.get(g).push(m);
+  });
+  const genLabel = (g) => {
+    if (g >= 2) return "Grandparents and above";
+    if (g === 1) return "Parents / uncles / aunts";
+    if (g === 0) return "Your generation";
+    if (g === -1) return "Children / nieces / nephews";
+    return "Grandchildren and below";
+  };
+  const gens = Array.from(byGen.keys()).sort((a, b) => b - a);
+  const sections = gens.map((g) => {
+    const rows = byGen.get(g)
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((m) => {
+        const rel = m.id === focusPersonId ? "You" : computeKinship(m.id);
+        const age = calculateAgeFromDob(m.dob);
+        return `<tr>
+          <td>${escapeHtml(m.name)}</td>
+          <td>${m.gender === "male" ? "Male" : "Female"}</td>
+          <td>${age !== "" ? age : "—"}</td>
+          <td>${escapeHtml(rel)}</td>
+        </tr>`;
+      }).join("");
+    return `<h2>${genLabel(g)}</h2>
+      <table>
+        <thead><tr><th>Name</th><th>Gender</th><th>Age</th><th>Relation to ${escapeHtml(focus ? focus.name : "")}</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }).join("");
+
+  const sheet = document.getElementById("printSheet");
+  sheet.hidden = false;
+  sheet.innerHTML = `
+    <h1>Family Tree</h1>
+    <p class="print-meta">v${APP_VERSION} · Printed ${new Date().toLocaleString()} · ${family.length} people · Viewing as <strong>${escapeHtml(focus ? focus.name : "")}</strong></p>
+    ${sections}
+  `;
+  document.getElementById("headerMenu")?.classList.add("hidden");
+  window.print();
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   initializeApp();
 });
 
 window.addEventListener("beforeunload", () => {
   if (family.length) persistLocalOnly();
+});
+
+window.addEventListener("afterprint", () => {
+  const sheet = document.getElementById("printSheet");
+  if (sheet) {
+    sheet.hidden = true;
+    sheet.innerHTML = "";
+  }
 });

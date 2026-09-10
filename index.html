@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Family Tree</title>
+  <title>Family Tree v1.5.0</title>
   <link rel="stylesheet" href="style.css">
   <script src="d3.min.js" defer></script>
   <script src="script.js" defer></script>
@@ -18,16 +18,22 @@
     <div class="header-main">
       <div class="brand">
         <span class="brand-mark">🌳</span>
-        <div class="head-edit">
-          <label class="micro-label" for="mainPersonInput">Family head</label>
-          <div class="inline-edit">
-            <input id="mainPersonInput" type="text" placeholder="Root name…" autocomplete="off">
-            <button type="button" class="btn btn-primary btn-xs" onclick="saveMainPersonName()">Save</button>
+        <div>
+          <div class="app-name-row">
+            <span class="app-name">Family Tree</span>
+            <span class="app-version" id="appVersion">v1.5.0</span>
           </div>
-        </div>
-        <div class="viewing-as">
-          <p class="micro-label">Viewing as</p>
-          <p class="focus-name" id="focusStatus">—</p>
+          <div class="head-edit">
+            <label class="micro-label" for="mainPersonInput">Family head</label>
+            <div class="inline-edit">
+              <input id="mainPersonInput" type="text" placeholder="Root name…" autocomplete="off">
+              <button type="button" class="btn btn-primary btn-xs" onclick="saveMainPersonName()">Save</button>
+            </div>
+          </div>
+          <div class="viewing-as">
+            <p class="micro-label">Viewing as</p>
+            <p class="focus-name" id="focusStatus">—</p>
+          </div>
         </div>
       </div>
       <div class="header-tools">
@@ -58,6 +64,7 @@
         <input type="file" accept=".json" onchange="importFamilyJson(event)">
       </label>
       <button type="button" class="btn" onclick="toggleVisitsPanel()">Visitors</button>
+      <button type="button" class="btn" onclick="printFamilyTree()">Print / PDF</button>
       <button type="button" class="btn" onclick="toggleEventsPanel()">Events</button>
       <button type="button" class="btn" onclick="resetZoom()">Fit view</button>
       <button type="button" class="btn btn-danger" onclick="clearStorageAndReset()">Reset this device</button>
@@ -96,7 +103,7 @@
     <div class="drawer-head">
       <div>
         <h2>Visitors</h2>
-        <p class="muted">Opened <strong id="openCount">—</strong> times</p>
+        <p class="muted">Opened <strong id="openCount">0</strong> times</p>
       </div>
       <button type="button" class="icon-btn" onclick="toggleVisitsPanel()" aria-label="Close">✕</button>
     </div>
@@ -116,19 +123,25 @@
     <div class="modal">
       <button type="button" class="modal-close" onclick="closeModal('settingsModal')">✕</button>
       <h3>Keep data on the website</h3>
-      <p class="muted">Adds and edits are always saved on this phone or computer. To keep the same tree on every device, save it to GitHub (the hosted site).</p>
+      <ol class="howto">
+        <li>Anything you add is already saved <strong>on this phone or computer</strong>. Refresh keeps it. App updates do not erase it.</li>
+        <li>To see the same people on another device, publish to GitHub (the live site).</li>
+        <li>Open <a href="https://github.com/settings/tokens/new?scopes=repo&amp;description=family-tree-website-save" target="_blank" rel="noopener">this token page</a>, create a token with <strong>repo</strong> access, copy it.</li>
+        <li>Paste the token below and tap <strong>Publish to website</strong>.</li>
+        <li>Wait about one minute, then open the site on the other phone. Use <strong>Save to website</strong> after each batch of new relatives.</li>
+      </ol>
       <label class="field">
         <span>GitHub repository</span>
         <input type="text" id="githubRepo" placeholder="owner/repo" autocomplete="off">
       </label>
       <label class="field">
-        <span>GitHub token (stays on this device)</span>
+        <span>GitHub token (stays on this device only)</span>
         <input type="password" id="githubToken" placeholder="ghp_…" autocomplete="off">
       </label>
-      <p class="muted">Create a token with access to this repo: GitHub → Settings → Developer settings → Personal access tokens. You only paste it here; it is not uploaded in the family JSON.</p>
+      <p class="muted">The token is never stored in the family JSON. Only you need it — relatives can still view the published tree.</p>
       <div class="modal-actions">
         <button type="button" class="btn" onclick="closeModal('settingsModal')">Close</button>
-        <button type="button" class="btn btn-primary" onclick="saveGithubSettings()">Save settings &amp; publish</button>
+        <button type="button" class="btn btn-primary" onclick="saveGithubSettings()">Publish to website</button>
       </div>
     </div>
   </div>
@@ -213,5 +226,6 @@
       </form>
     </div>
   </div>
+  <div id="printSheet" hidden></div>
 </body>
 </html>
