@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Family Tree v1.5.0</title>
+  <title>Family Tree v1.5.1</title>
   <link rel="stylesheet" href="style.css">
   <script src="d3.min.js" defer></script>
   <script src="script.js" defer></script>
@@ -21,7 +21,7 @@
         <div>
           <div class="app-name-row">
             <span class="app-name">Family Tree</span>
-            <span class="app-version" id="appVersion">v1.5.0</span>
+            <span class="app-version" id="appVersion">v1.5.1</span>
           </div>
           <div class="head-edit">
             <label class="micro-label" for="mainPersonInput">Family head</label>
@@ -123,12 +123,30 @@
     <div class="modal">
       <button type="button" class="modal-close" onclick="closeModal('settingsModal')">✕</button>
       <h3>Keep data on the website</h3>
+      <p class="muted">Log into GitHub as <strong>anilsfdc3006-ctrl</strong> (the account that owns this site).</p>
+      <p class="howto-heading">A. In this Family Tree app</p>
       <ol class="howto">
-        <li>Anything you add is already saved <strong>on this phone or computer</strong>. Refresh keeps it. App updates do not erase it.</li>
-        <li>To see the same people on another device, publish to GitHub (the live site).</li>
-        <li>Open <a href="https://github.com/settings/tokens/new?scopes=repo&amp;description=family-tree-website-save" target="_blank" rel="noopener">this token page</a>, create a token with <strong>repo</strong> access, copy it.</li>
-        <li>Paste the token below and tap <strong>Publish to website</strong>.</li>
-        <li>Wait about one minute, then open the site on the other phone. Use <strong>Save to website</strong> after each batch of new relatives.</li>
+        <li>Tap <strong>☰</strong> (top right) → <strong>Save settings</strong> (this screen).</li>
+        <li>Leave repository as <strong>anilsfdc3006-ctrl/family-tree</strong>.</li>
+      </ol>
+      <p class="howto-heading">B. Create a GitHub token</p>
+      <ol class="howto" start="3">
+        <li>On github.com, tap your <strong>profile photo</strong> (top right) → <strong>Settings</strong>.</li>
+        <li>Scroll the left menu to the bottom → <strong>Developer settings</strong>.</li>
+        <li><strong>Personal access tokens</strong> → <strong>Tokens (classic)</strong>.</li>
+        <li><strong>Generate new token</strong> → <strong>Generate new token (classic)</strong>. Confirm password if asked.</li>
+        <li>Note: <code>family-tree-website-save</code></li>
+        <li>Expiration: <strong>90 days</strong> (or No expiration if you prefer).</li>
+        <li>Scopes: tick <strong>repo</strong> (the first checkbox). Leave the rest unticked.</li>
+        <li>Tap <strong>Generate token</strong>. Copy the value starting with <code>ghp_</code>. GitHub shows it only once.</li>
+        <li>Or use this shortcut (same form, repo already ticked): <a href="https://github.com/settings/tokens/new?scopes=repo&amp;description=family-tree-website-save" target="_blank" rel="noopener">Open token form</a>.</li>
+      </ol>
+      <p class="howto-heading">C. Publish</p>
+      <ol class="howto" start="12">
+        <li>Paste the token in the box below.</li>
+        <li>Tap <strong>Publish to website</strong>. Status should say “Saved to website”.</li>
+        <li>Wait about 1 minute, then open <a href="https://anilsfdc3006-ctrl.github.io/family-tree/" target="_blank" rel="noopener">the live site</a> on the other phone.</li>
+        <li>After adding more relatives later: ☰ → <strong>Save to website</strong>.</li>
       </ol>
       <label class="field">
         <span>GitHub repository</span>

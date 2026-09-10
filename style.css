@@ -152,7 +152,7 @@ html, body {
 }
 
 .howto {
-  margin: 10px 0 0;
+  margin: 6px 0 12px;
   padding-left: 18px;
   color: #cbd5e1;
   font-size: 13px;
@@ -160,6 +160,19 @@ html, body {
 }
 
 .howto a { color: #a5b4fc; }
+.howto code {
+  font-size: 12px;
+  background: #0f172a;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.howto-heading {
+  margin: 12px 0 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #c7d2fe;
+}
 
 .inline-edit {
   display: flex;
