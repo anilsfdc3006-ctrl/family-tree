@@ -2,161 +2,171 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Dynamic Telugu Family Tree</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Family Tree</title>
   <link rel="stylesheet" href="style.css">
+  <script src="d3.min.js" defer></script>
+  <script src="script.js" defer></script>
 </head>
-<body class="bg-slate-900 text-slate-100 relative">
+<body>
+  <div id="loadingScreen">
+    <div class="spinner"></div>
+    <p>Loading family tree…</p>
+  </div>
 
-  <!-- Header Controls -->
-  <header class="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-    <div class="pointer-events-auto flex items-center gap-2.5 bg-slate-800/95 backdrop-blur border border-slate-700 shadow-xl rounded-xl p-2 px-3">
-      <span class="text-xl">🌳</span>
-      <div class="flex items-center gap-1.5 border-r border-slate-700 pr-2.5">
-        <div>
-          <label class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Family Head</label>
-          <div class="flex items-center gap-1 mt-0.5">
-            <input id="mainPersonInput" type="text" placeholder="Root name..." class="border border-slate-600 rounded px-2 py-0.5 text-xs text-white font-semibold focus:outline-indigo-500 w-24 bg-slate-900">
-            <button onclick="saveMainPersonName()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[10px] px-2 py-1 rounded transition">Save</button>
+  <header class="app-header">
+    <div class="header-main">
+      <div class="brand">
+        <span class="brand-mark">🌳</span>
+        <div class="head-edit">
+          <label class="micro-label" for="mainPersonInput">Family head</label>
+          <div class="inline-edit">
+            <input id="mainPersonInput" type="text" placeholder="Root name…" autocomplete="off">
+            <button type="button" class="btn btn-primary btn-xs" onclick="saveMainPersonName()">Save</button>
           </div>
         </div>
+        <div class="viewing-as">
+          <p class="micro-label">Viewing as</p>
+          <p class="focus-name" id="focusStatus">—</p>
+        </div>
       </div>
-      <div>
-        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Viewing As</p>
-        <p class="text-xs text-indigo-400 font-extrabold" id="focusStatus">arjun</p>
+      <div class="header-tools">
+        <button type="button" class="btn" onclick="toggleMembersPanel()">People</button>
+        <button type="button" class="icon-btn" id="menuToggle" onclick="toggleHeaderMenu()" aria-label="More">☰</button>
       </div>
     </div>
 
-    <div class="pointer-events-auto flex items-center bg-slate-800/95 backdrop-blur border border-slate-700 shadow-xl rounded-xl px-2.5 py-1.5 w-44 md:w-56">
-      <span class="text-slate-400 mr-1.5 text-xs">🔍</span>
-      <input id="searchInput" type="text" placeholder="Search relative..." class="w-full bg-transparent text-xs focus:outline-none text-white placeholder-slate-400" oninput="handleSearch(this.value)">
+    <div class="header-search">
+      <span class="search-icon">🔍</span>
+      <input id="searchInput" type="search" placeholder="Search relative…" autocomplete="off" oninput="handleSearch(this.value)">
     </div>
 
-    <div class="pointer-events-auto flex items-center gap-1.5">
-      <button onclick="exportFamilyJson()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 font-medium" title="Save backup">
-        <span>📤</span> Export
-      </button>
-      <label class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 font-medium cursor-pointer" title="Load backup">
-        <span>📥</span> Import
-        <input type="file" accept=".json" onchange="importFamilyJson(event)" class="hidden">
+    <div id="headerMenu" class="header-actions hidden">
+      <div class="menu-head-edit">
+        <label class="micro-label" for="mainPersonInputMenu">Family head</label>
+        <div class="inline-edit">
+          <input id="mainPersonInputMenu" type="text" placeholder="Root name…" autocomplete="off">
+          <button type="button" class="btn btn-primary btn-xs" onclick="saveMainPersonName(true)">Save</button>
+        </div>
+      </div>
+      <button type="button" class="btn" onclick="exportFamilyJson()">Export</button>
+      <label class="btn file-btn">
+        Import
+        <input type="file" accept=".json" onchange="importFamilyJson(event)">
       </label>
-      <button onclick="toggleEventsPanel()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 font-medium">
-        <span>🎉</span> Events
-      </button>
-      <button onclick="resetZoom()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 shadow-md text-xs px-2.5 py-1.5 rounded-xl transition font-medium">Fit View</button>
-      <button onclick="clearStorageAndReset()" class="bg-rose-950/40 hover:bg-rose-900 border border-rose-800 text-rose-300 shadow-md text-xs px-2 py-1.5 rounded-xl transition font-medium">Reset</button>
+      <button type="button" class="btn" onclick="toggleEventsPanel()">Events</button>
+      <button type="button" class="btn" onclick="resetZoom()">Fit view</button>
+      <button type="button" class="btn btn-danger" onclick="clearStorageAndReset()">Reset</button>
     </div>
   </header>
 
-  <!-- Side Events Drawer -->
-  <div id="eventsDrawer" class="hidden absolute top-16 right-3 z-20 w-72 bg-slate-800 border border-slate-700 shadow-2xl rounded-2xl p-4 transition-all">
-    <div class="flex justify-between items-center mb-2.5">
-      <h2 class="font-bold text-white text-xs">Upcoming Milestones (30 Days)</h2>
-      <button onclick="toggleEventsPanel()" class="text-slate-400 hover:text-white text-xs">✕</button>
-    </div>
-    <div id="eventsList" class="space-y-1.5 text-xs text-slate-300 max-h-80 overflow-y-auto"></div>
+  <div id="viewport">
+    <svg id="treeCanvas"></svg>
+    <div id="nodesLayer"></div>
   </div>
 
-  <!-- SVG Canvas -->
-  <svg id="treeCanvas" class="w-full h-full"></svg>
+  <button type="button" class="fab" onclick="toggleMembersPanel()" title="Family members">👥</button>
 
-  <!-- Add Relative Modal -->
-  <div id="addModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl max-w-sm w-full p-5 relative">
-      <button onclick="closeModal('addModal')" class="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
-      <h3 id="modalTitle" class="font-bold text-white text-base mb-0.5">Add Relative</h3>
-      <p id="modalSubtitle" class="text-xs text-slate-400 mb-4">Enter details below</p>
-      
-      <form id="memberForm" onsubmit="handleFormSubmit(event)" class="space-y-3">
+  <aside id="membersDrawer" class="drawer hidden">
+    <div class="drawer-head">
+      <div>
+        <h2>Family members</h2>
+        <p class="muted"><span id="memberCount">0</span> people</p>
+      </div>
+      <button type="button" class="icon-btn" onclick="toggleMembersPanel()" aria-label="Close">✕</button>
+    </div>
+    <input id="memberFilter" type="search" placeholder="Filter names…" autocomplete="off" oninput="updateMembersList()">
+    <div id="focusActions" class="focus-actions"></div>
+    <div id="membersList" class="members-list"></div>
+  </aside>
+
+  <aside id="eventsDrawer" class="drawer drawer-narrow hidden">
+    <div class="drawer-head">
+      <h2>Upcoming (30 days)</h2>
+      <button type="button" class="icon-btn" onclick="toggleEventsPanel()" aria-label="Close">✕</button>
+    </div>
+    <div id="eventsList" class="events-list"></div>
+  </aside>
+
+  <div id="addModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button type="button" class="modal-close" onclick="closeModal('addModal')">✕</button>
+      <h3 id="modalTitle">Add relative</h3>
+      <p id="modalSubtitle" class="muted">Enter details below</p>
+      <form id="memberForm" onsubmit="handleFormSubmit(event)">
         <input type="hidden" id="formTargetId" value="">
         <input type="hidden" id="formRelationType" value="">
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Full Name *</label>
-          <input type="text" id="formFullName" required placeholder="Full Name" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-indigo-500">
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Gender *</label>
-          <select id="formGender" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-indigo-500">
+        <label class="field">
+          <span>Full name *</span>
+          <input type="text" id="formFullName" required placeholder="Full name" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>Gender *</span>
+          <select id="formGender">
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
+        </label>
+        <div class="field-grid">
+          <label class="field">
+            <span>Birth date</span>
+            <input type="date" id="formDob" oninput="syncDobToAge('formDob', 'formAge')">
+          </label>
+          <label class="field">
+            <span>Age (years)</span>
+            <input type="number" id="formAge" min="0" max="130" placeholder="e.g. 25" inputmode="numeric" oninput="syncAgeToDob('formAge', 'formDob')">
+          </label>
         </div>
-
-        <div class="grid grid-cols-2 gap-2 bg-slate-900/50 p-2.5 rounded-xl border border-slate-700">
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Birth Date</label>
-            <input type="date" id="formDob" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-indigo-500" oninput="syncDobToAge('formDob', 'formAge')">
-          </div>
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Age (Years)</label>
-            <input type="number" id="formAge" min="0" max="130" placeholder="e.g. 25" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-indigo-500" oninput="syncAgeToDob('formAge', 'formDob')">
-          </div>
-        </div>
-
-        <div id="anniversaryGroup" class="hidden">
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Anniversary Date</label>
-          <input type="date" id="formAnniversary" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-indigo-500">
-        </div>
-
-        <div class="flex justify-end gap-2 pt-3">
-          <button type="button" onclick="closeModal('addModal')" class="px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-700 rounded-lg">Cancel</button>
-          <button type="submit" class="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm">Save & Update</button>
+        <label id="anniversaryGroup" class="field hidden">
+          <span>Anniversary date</span>
+          <input type="date" id="formAnniversary">
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn" onclick="closeModal('addModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save & update</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Edit Member Modal -->
-  <div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl max-w-sm w-full p-5 relative">
-      <button onclick="closeModal('editModal')" class="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
-      <h3 class="font-bold text-white text-base mb-0.5">Edit Member Details</h3>
-      <p class="text-xs text-slate-400 mb-4">Update details</p>
-      
-      <form id="editForm" onsubmit="handleEditFormSubmit(event)" class="space-y-3">
+  <div id="editModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button type="button" class="modal-close" onclick="closeModal('editModal')">✕</button>
+      <h3>Edit member</h3>
+      <p class="muted">Update details</p>
+      <form id="editForm" onsubmit="handleEditFormSubmit(event)">
         <input type="hidden" id="editMemberId" value="">
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Full Name *</label>
-          <input type="text" id="editFullName" required placeholder="Full Name" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-indigo-500">
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Gender *</label>
-          <select id="editGender" class="w-full border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-indigo-500 bg-slate-900">
+        <label class="field">
+          <span>Full name *</span>
+          <input type="text" id="editFullName" required placeholder="Full name" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>Gender *</span>
+          <select id="editGender">
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
+        </label>
+        <div class="field-grid">
+          <label class="field">
+            <span>Birth date</span>
+            <input type="date" id="editDob" oninput="syncDobToAge('editDob', 'editAge')">
+          </label>
+          <label class="field">
+            <span>Age (years)</span>
+            <input type="number" id="editAge" min="0" max="130" placeholder="e.g. 25" inputmode="numeric" oninput="syncAgeToDob('editAge', 'editDob')">
+          </label>
         </div>
-
-        <div class="grid grid-cols-2 gap-2 bg-slate-900/50 p-2.5 rounded-xl border border-slate-700">
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Birth Date</label>
-            <input type="date" id="editDob" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-indigo-500" oninput="syncDobToAge('editDob', 'editAge')">
-          </div>
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Age (Years)</label>
-            <input type="number" id="editAge" min="0" max="130" placeholder="e.g. 25" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-indigo-500" oninput="syncAgeToDob('editAge', 'editDob')">
-          </div>
-        </div>
-
-        <div id="editAnniversaryGroup">
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Anniversary Date</label>
-          <input type="date" id="editAnniversary" class="w-full border border-slate-700 rounded-lg px-2 py-1.5 text-xs focus:outline-indigo-500 bg-slate-900">
-        </div>
-
-        <div class="flex justify-end gap-2 pt-3">
-          <button type="button" onclick="closeModal('editModal')" class="px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-700 rounded-lg">Cancel</button>
-          <button type="submit" class="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm">Save Changes</button>
+        <label id="editAnniversaryGroup" class="field">
+          <span>Anniversary date</span>
+          <input type="date" id="editAnniversary">
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn" onclick="closeModal('editModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save changes</button>
         </div>
       </form>
     </div>
   </div>
-
-  <script src="script.js"></script>
 </body>
 </html>
