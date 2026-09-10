@@ -1,4 +1,4 @@
-const APP_VERSION = "1.5.3";
+const APP_VERSION = "1.5.4";
 const STORAGE_KEY = "telugu_family_tree_data_v31";
 const FOCUS_KEY = "telugu_family_tree_focus_v31";
 const OPENS_KEY = "telugu_family_tree_open_count";
@@ -624,13 +624,13 @@ function pathBetter(next, prev) {
   return false;
 }
 
-function buildKinshipIndex(egoId) {
-  const ego = getMember(egoId);
+function bfsKinship(rootId, skipRootSpouse) {
+  const root = getMember(rootId);
   const index = new Map();
-  if (!ego) return index;
+  if (!root) return index;
 
   const start = {
-    id: ego.id,
+    id: root.id,
     gen: 0,
     cross: false,
     line: "E",
@@ -640,7 +640,7 @@ function buildKinshipIndex(egoId) {
     hop: null
   };
   const queue = [start];
-  index.set(ego.id, start);
+  index.set(root.id, start);
 
   for (let i = 0; i < queue.length; i++) {
     const cur = queue[i];
@@ -649,6 +649,7 @@ function buildKinshipIndex(egoId) {
     const edges = kinshipNeighbors(person);
     for (const edge of edges) {
       const nxt = edge.to;
+      if (skipRootSpouse && cur.id === rootId && edge.type === "spouse") continue;
       let gen = cur.gen;
       let cross = cur.cross;
       let line = cur.line;
@@ -660,8 +661,7 @@ function buildKinshipIndex(egoId) {
         cross = !cross;
         affinal = true;
       }
-      if (cur.id === ego.id && edge.type === "parent") line = nxt.gender === "male" ? "P" : "M";
-      if (cur.id === ego.id && edge.type === "spouse") line = "S";
+      if (cur.id === rootId && edge.type === "parent") line = nxt.gender === "male" ? "P" : "M";
       const cell = {
         id: nxt.id,
         gen,
@@ -670,13 +670,84 @@ function buildKinshipIndex(egoId) {
         affinal,
         minGen: Math.min(cur.minGen, gen),
         dist: cur.dist + 1,
-        hop: cur.id === ego.id ? edge.type : cur.hop
+        hop: cur.id === rootId ? edge.type : cur.hop
       };
       if (!pathBetter(cell, index.get(nxt.id))) continue;
       index.set(nxt.id, cell);
       queue.push(cell);
     }
   }
+  return index;
+}
+
+function mapThroughSpouse(cell, person) {
+  if (cell.dist === 1 && cell.hop === "parent") {
+    return {
+      id: person.id,
+      gen: 1,
+      cross: true,
+      line: "S",
+      affinal: true,
+      minGen: 0,
+      dist: 2,
+      hop: "parent"
+    };
+  }
+  if (cell.dist === 1 && cell.hop === "child") {
+    return {
+      id: person.id,
+      gen: -1,
+      cross: false,
+      line: "E",
+      affinal: false,
+      minGen: -1,
+      dist: 2,
+      hop: "child"
+    };
+  }
+  if (cell.dist === 1 && cell.hop === "sibling") {
+    return {
+      id: person.id,
+      gen: 0,
+      cross: true,
+      line: "S",
+      affinal: true,
+      minGen: 0,
+      dist: 2,
+      hop: "sibling"
+    };
+  }
+  return { ...cell, id: person.id, dist: cell.dist + 1 };
+}
+
+function buildKinshipIndex(egoId) {
+  const ego = getMember(egoId);
+  if (!ego) return new Map();
+  const index = bfsKinship(egoId, true);
+  const spouse = ego.spouseId ? getMember(ego.spouseId) : null;
+  if (!spouse) return index;
+
+  index.set(spouse.id, {
+    id: spouse.id,
+    gen: 0,
+    cross: true,
+    line: "S",
+    affinal: true,
+    minGen: 0,
+    dist: 1,
+    hop: "spouse"
+  });
+
+  const fromSpouse = bfsKinship(spouse.id, true);
+  fromSpouse.forEach((cell, id) => {
+    if (id === ego.id || id === spouse.id) return;
+    const person = getMember(id);
+    if (!person) return;
+    const mapped = mapThroughSpouse(cell, person);
+    const existing = index.get(id);
+    if (existing && !pathBetter(mapped, existing)) return;
+    index.set(id, mapped);
+  });
   return index;
 }
 
@@ -724,7 +795,7 @@ function termGenPlus1(ego, alter, cell) {
   const spouseVsFather = spouse && father ? isOlder(spouse, father) : vsFather;
   const spouseVsMother = spouse && mother ? isOlder(spouse, mother) : vsMother;
 
-  if (cell.line === "S") {
+  if (cell.line === "S" && cell.hop === "parent") {
     return male ? "మామగారు (Mamagaru)" : "అత్తగారు / అత్త (Atthagaru)";
   }
 
