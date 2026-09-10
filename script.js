@@ -1,4 +1,4 @@
-const APP_VERSION = "1.5.6";
+const APP_VERSION = "1.5.7";
 const STORAGE_KEY = "telugu_family_tree_data_v31";
 const FOCUS_KEY = "telugu_family_tree_focus_v31";
 const OPENS_KEY = "telugu_family_tree_open_count";
@@ -626,7 +626,7 @@ function pathBetter(next, prev) {
   return false;
 }
 
-function bfsKinship(rootId, skipRootSpouse) {
+function bfsKinship(rootId, skipRootSpouse, skipId) {
   const root = getMember(rootId);
   const index = new Map();
   if (!root) return index;
@@ -651,6 +651,7 @@ function bfsKinship(rootId, skipRootSpouse) {
     const edges = kinshipNeighbors(person);
     for (const edge of edges) {
       const nxt = edge.to;
+      if (skipId && nxt.id === skipId) continue;
       if (skipRootSpouse && cur.id === rootId && edge.type === "spouse") continue;
       let gen = cur.gen;
       let cross = cur.cross;
@@ -725,7 +726,7 @@ function mapThroughSpouse(cell, person) {
 function buildKinshipIndex(egoId) {
   const ego = getMember(egoId);
   if (!ego) return new Map();
-  const index = bfsKinship(egoId, true);
+  const index = bfsKinship(egoId, true, ego.spouseId || null);
   const spouse = ego.spouseId ? getMember(ego.spouseId) : null;
   if (!spouse) return index;
 
@@ -740,7 +741,7 @@ function buildKinshipIndex(egoId) {
     hop: "spouse"
   });
 
-  const fromSpouse = bfsKinship(spouse.id, true);
+  const fromSpouse = bfsKinship(spouse.id, true, ego.id);
   fromSpouse.forEach((cell, id) => {
     if (id === ego.id || id === spouse.id) return;
     const person = getMember(id);
@@ -890,6 +891,13 @@ function assignRoles(egoId) {
   });
   (childrenByParent.get(ego.id) || []).forEach((c) => putRole(roles, c.id, c.gender === "male" ? "SON" : "DAUGHTER"));
 
+  const bloodIdx = bfsKinship(ego.id, true, ego.spouseId || null);
+  family.forEach((person) => {
+    if (roles.has(person.id)) return;
+    const r = cellToRole(ego, person, bloodIdx.get(person.id));
+    if (r) putRole(roles, person.id, r);
+  });
+
   if (ego.spouseId) {
     const spouse = getMember(ego.spouseId);
     if (spouse) {
@@ -913,7 +921,7 @@ function assignRoles(egoId) {
         });
       });
       (childrenByParent.get(spouse.id) || []).forEach((c) => putRole(roles, c.id, c.gender === "male" ? "SON" : "DAUGHTER"));
-      const spIdx = bfsKinship(spouse.id, true);
+      const spIdx = bfsKinship(spouse.id, true, ego.id);
       family.forEach((person) => {
         if (roles.has(person.id)) return;
         const cell = spIdx.get(person.id);
