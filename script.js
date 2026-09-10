@@ -37,6 +37,9 @@ let focusPersonId = "";
 let memberById = new Map();
 let parentsCache = new Map();
 let kinshipCache = new Map();
+let childrenByParent = new Map();
+let siblingIds = new Map();
+let kinshipIndex = null;
 let lastLayout = null;
 let viewport, svg, container, nodesLayer, zoom;
 
@@ -54,6 +57,24 @@ function rebuildIndexes() {
   memberById = new Map(family.map((m) => [m.id, m]));
   parentsCache = new Map();
   kinshipCache = new Map();
+  kinshipIndex = null;
+  childrenByParent = new Map();
+  family.forEach((m) => {
+    getAllParents(m).forEach((p) => {
+      if (!childrenByParent.has(p.id)) childrenByParent.set(p.id, []);
+      childrenByParent.get(p.id).push(m);
+    });
+  });
+  siblingIds = new Map();
+  family.forEach((m) => {
+    const set = new Set();
+    getAllParents(m).forEach((p) => {
+      (childrenByParent.get(p.id) || []).forEach((c) => {
+        if (c.id !== m.id) set.add(c.id);
+      });
+    });
+    siblingIds.set(m.id, Array.from(set));
+  });
 }
 
 function getMember(id) {
@@ -190,411 +211,221 @@ const areSiblings = (p1, p2) => {
   return p1Parents.some((id) => p2Parents.includes(id));
 };
 
-function cousinRole(egoParent, linkingRelative, child) {
-  const parallel = egoParent.gender === linkingRelative.gender;
-  if (parallel) return child.gender === "male" ? "BROTHER" : "SISTER";
-  return child.gender === "male" ? "CROSS_MALE_COUSIN" : "CROSS_FEMALE_COUSIN";
+function kinshipNeighbors(person) {
+  const out = [];
+  getAllParents(person).forEach((p) => out.push({ to: p, type: "parent" }));
+  (childrenByParent.get(person.id) || []).forEach((c) => out.push({ to: c, type: "child" }));
+  (siblingIds.get(person.id) || []).forEach((id) => {
+    const s = getMember(id);
+    if (s) out.push({ to: s, type: "sibling" });
+  });
+  if (person.spouseId) {
+    const sp = getMember(person.spouseId);
+    if (sp) out.push({ to: sp, type: "spouse" });
+  }
+  return out;
 }
 
-function getBloodKinshipRole(pA, pB) {
-  if (!pA || !pB || pA.id === pB.id) return null;
-
-  const aParents = getAllParents(pA);
-  const bParents = getAllParents(pB);
-
-  if (aParents.some((p) => p.id === pB.id)) {
-    return { role: pB.gender === "male" ? "FATHER" : "MOTHER", isBio: true };
-  }
-  if (bParents.some((p) => p.id === pA.id || (pA.spouseId && p.id === pA.spouseId))) {
-    return { role: pB.gender === "male" ? "SON" : "DAUGHTER", isBio: (pB.parentIds || []).includes(pA.id) };
-  }
-  if (areSiblings(pA, pB)) {
-    return { role: pB.gender === "male" ? "BROTHER" : "SISTER", isBio: true };
-  }
-
-  const aFather = aParents.find((p) => p.gender === "male");
-  const aMother = aParents.find((p) => p.gender === "female");
-
-  if (aFather && getAllParents(aFather).some((p) => p.id === pB.id)) {
-    return { role: pB.gender === "male" ? "PATERNAL_GRANDFATHER" : "PATERNAL_GRANDMOTHER", isBio: true };
-  }
-  if (aMother && getAllParents(aMother).some((p) => p.id === pB.id)) {
-    return { role: pB.gender === "male" ? "MATERNAL_GRANDFATHER" : "MATERNAL_GRANDMOTHER", isBio: true };
-  }
-
-  if (aFather && areSiblings(aFather, pB)) {
-    return { role: pB.gender === "male" ? (isOlder(pB, aFather) ? "PEDDANANNA" : "BABAI") : "MENATTHA", isBio: false };
-  }
-  if (aMother && areSiblings(aMother, pB)) {
-    return { role: pB.gender === "male" ? "MENAMAMA" : (isOlder(pB, aMother) ? "PEDDAMMA" : "PINNI"), isBio: false };
-  }
-
-  if (pB.spouseId) {
-    const bSpouse = getMember(pB.spouseId);
-    if (bSpouse) {
-      if (aMother && areSiblings(aMother, bSpouse) && bSpouse.gender === "female") {
-        return { role: isOlder(pB, aMother) ? "PEDDANANNA" : "BABAI", isBio: false };
-      }
-      if (aMother && areSiblings(aMother, bSpouse) && bSpouse.gender === "male") {
-        return { role: "ATTAYYA", isBio: false };
-      }
-      if (aFather && areSiblings(aFather, bSpouse) && bSpouse.gender === "male") {
-        return { role: isOlder(bSpouse, aFather) ? "PEDDAMMA" : "PINNI", isBio: false };
-      }
-      if (aFather && areSiblings(aFather, bSpouse) && bSpouse.gender === "female") {
-        return { role: "MAMAYYA", isBio: false };
-      }
-    }
-  }
-
-  for (const bp of bParents) {
-    if (aFather && areSiblings(aFather, bp)) {
-      return { role: cousinRole(aFather, bp, pB), isBio: false };
-    }
-    if (aMother && areSiblings(aMother, bp)) {
-      return { role: cousinRole(aMother, bp, pB), isBio: false };
-    }
-  }
-
-  return null;
+function pathBetter(next, prev) {
+  if (!prev) return true;
+  if (next.dist !== prev.dist) return next.dist < prev.dist;
+  if (next.affinal !== prev.affinal) return !next.affinal && prev.affinal;
+  return false;
 }
 
-function isCrossCousinRole(role) {
-  return role === "CROSS_MALE_COUSIN" || role === "CROSS_FEMALE_COUSIN";
+function buildKinshipIndex(egoId) {
+  const ego = getMember(egoId);
+  const index = new Map();
+  if (!ego) return index;
+
+  const start = {
+    id: ego.id,
+    gen: 0,
+    cross: false,
+    line: "E",
+    affinal: false,
+    minGen: 0,
+    dist: 0,
+    hop: null
+  };
+  const queue = [start];
+  index.set(ego.id, start);
+
+  for (let i = 0; i < queue.length; i++) {
+    const cur = queue[i];
+    const person = getMember(cur.id);
+    if (!person) continue;
+    const edges = kinshipNeighbors(person);
+    for (const edge of edges) {
+      const nxt = edge.to;
+      let gen = cur.gen;
+      let cross = cur.cross;
+      let line = cur.line;
+      let affinal = cur.affinal;
+      if (edge.type === "parent") gen += 1;
+      else if (edge.type === "child") gen -= 1;
+      if (edge.type === "sibling" && cur.gen > 0 && person.gender !== nxt.gender) cross = !cross;
+      if (edge.type === "spouse") {
+        cross = !cross;
+        affinal = true;
+      }
+      if (cur.id === ego.id && edge.type === "parent") line = nxt.gender === "male" ? "P" : "M";
+      if (cur.id === ego.id && edge.type === "spouse") line = "S";
+      const cell = {
+        id: nxt.id,
+        gen,
+        cross,
+        line,
+        affinal,
+        minGen: Math.min(cur.minGen, gen),
+        dist: cur.dist + 1,
+        hop: cur.id === ego.id ? edge.type : cur.hop
+      };
+      if (!pathBetter(cell, index.get(nxt.id))) continue;
+      index.set(nxt.id, cell);
+      queue.push(cell);
+    }
+  }
+  return index;
 }
 
-function isParallelSiblingRole(role) {
-  return role === "BROTHER" || role === "SISTER";
+function ensureKinshipIndex() {
+  if (!kinshipIndex) kinshipIndex = buildKinshipIndex(focusPersonId);
 }
 
-function getDirectKinshipRole(pA, pB) {
-  if (!pA || !pB || pA.id === pB.id) return null;
-  if (pA.spouseId === pB.id) return { role: "SPOUSE", isBio: true };
+function bioTag(cell) {
+  if (!cell || cell.affinal) return "";
+  if (cell.dist === 1 && (cell.hop === "parent" || cell.hop === "child" || cell.hop === "sibling" || cell.hop === "spouse")) {
+    return " [సొంత]";
+  }
+  if (cell.dist === 2 && !cell.cross && (cell.gen === 2 || cell.gen === -2)) return " [సొంత]";
+  if (cell.dist === 2 && cell.gen === 0 && !cell.cross && cell.hop === "parent") return " [సొంత]";
+  return "";
+}
 
-  const blood = getBloodKinshipRole(pA, pB);
-  if (blood) return blood;
+function termGen0(ego, alter, cell) {
+  const male = alter.gender === "male";
+  const older = isOlder(alter, ego);
+  const femaleEgo = ego.gender === "female";
+  if (!cell.cross) {
+    if (male) return older ? "అన్నయ్య (Annayya)" : "తమ్ముడు (Tammudu)";
+    return older ? "అక్క (Akka)" : "చెల్లి (Chelli)";
+  }
+  if (femaleEgo) {
+    if (male) return older ? "బావగారు (Bavagaru)" : "మరిది (Maridi)";
+    return older ? "వదిన (Vadina)" : "ఆడబిడ్డ (Aadabidda)";
+  }
+  if (male) return older ? "బావ (Bava)" : "బావమరిది (Bavamariidi)";
+  return older ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
+}
 
-  if (pB.spouseId) {
-    const bSpouse = getMember(pB.spouseId);
-    const spouseBlood = getBloodKinshipRole(pA, bSpouse);
-    if (spouseBlood && isCrossCousinRole(spouseBlood.role)) {
-      return { role: pB.gender === "male" ? "BROTHER" : "SISTER", isBio: false };
-    }
-    if (spouseBlood && isParallelSiblingRole(spouseBlood.role)) {
-      return { role: pB.gender === "male" ? "SISTER_HUSBAND" : "BROTHER_WIFE", isBio: false };
-    }
+function termGenPlus1(ego, alter, cell) {
+  const male = alter.gender === "male";
+  const father = getAllParents(ego).find((p) => p.gender === "male");
+  const mother = getAllParents(ego).find((p) => p.gender === "female");
+  const vsFather = father ? isOlder(alter, father) : false;
+  const vsMother = mother ? isOlder(alter, mother) : false;
+  const spouse = alter.spouseId ? getMember(alter.spouseId) : null;
+  const spouseVsFather = spouse && father ? isOlder(spouse, father) : vsFather;
+  const spouseVsMother = spouse && mother ? isOlder(spouse, mother) : vsMother;
+
+  if (cell.line === "S") {
+    return male ? "మామగారు (Mamagaru)" : "అత్తగారు / అత్త (Atthagaru)";
   }
 
-  if (pA.spouseId) {
-    const spouse = getMember(pA.spouseId);
-    if (spouse) {
-      if (getAllParents(spouse).some((p) => p.id === pB.id)) {
-        return { role: pB.gender === "male" ? "MAMAGARU" : "ATTAGARU", isBio: false };
-      }
-      if (areSiblings(spouse, pB)) {
-        return {
-          role: pA.gender === "male"
-            ? (pB.gender === "male" ? "WIFE_BROTHER" : "WIFE_SISTER")
-            : (pB.gender === "male" ? "HUSBAND_BROTHER" : "HUSBAND_SISTER"),
-          isBio: false
-        };
-      }
-      const throughSpouse = getBloodKinshipRole(spouse, pB);
-      if (throughSpouse && isCrossCousinRole(throughSpouse.role)) {
-        return { role: pB.gender === "male" ? "BROTHER" : "SISTER", isBio: false };
-      }
-      if (throughSpouse && isParallelSiblingRole(throughSpouse.role)) {
-        return {
-          role: pA.gender === "male"
-            ? (pB.gender === "male" ? "WIFE_BROTHER" : "WIFE_SISTER")
-            : (pB.gender === "male" ? "HUSBAND_BROTHER" : "HUSBAND_SISTER"),
-          isBio: false
-        };
-      }
-    }
+  if (cell.line === "P") {
+    if (!cell.cross && male && !cell.affinal) return vsFather ? "పెద్దనాన్న (Peddananna)" : "బాబాయ్ (Babai)";
+    if (!cell.cross && male && cell.affinal) return "మామయ్య (Mamayya)";
+    if (!cell.cross && !male && !cell.affinal) return spouseVsFather ? "పెద్దమ్మ (Peddamma)" : "పిన్ని (Pinni)";
+    if (!cell.cross && !male && cell.affinal) return "అత్తయ్య (Attayya)";
+    if (cell.cross && !male && !cell.affinal) return "మేనత్త / అత్తయ్య (Menattha)";
+    if (cell.cross && !male && cell.affinal) return spouseVsFather ? "పెద్దమ్మ (Peddamma)" : "పిన్ని (Pinni)";
+    if (cell.cross && male && !cell.affinal) return "మేనమామ / మామయ్య (Menamama)";
+    if (cell.cross && male && cell.affinal) return "మామయ్య (Mamayya)";
   }
 
-  const bParentsNow = getAllParents(pB);
-  for (const bp of bParentsNow) {
-    const parentBlood = getBloodKinshipRole(pA, bp);
-    if (parentBlood && isCrossCousinRole(parentBlood.role)) {
-      return { role: pB.gender === "female" ? "MENAKODALU" : "MENALLUDU", isBio: false };
-    }
-    if (parentBlood && isParallelSiblingRole(parentBlood.role) && !parentBlood.isBio) {
-      return { role: pB.gender === "female" ? "DAUGHTER" : "SON", isBio: false };
-    }
-    if (bp.spouseId) {
-      const parentSpouseBlood = getBloodKinshipRole(pA, getMember(bp.spouseId));
-      if (parentSpouseBlood && isCrossCousinRole(parentSpouseBlood.role)) {
-        return { role: pB.gender === "female" ? "MENAKODALU" : "MENALLUDU", isBio: false };
-      }
-    }
+  if (cell.line === "M") {
+    if (!cell.cross && !male && !cell.affinal) return vsMother ? "పెద్దమ్మ (Peddamma)" : "పిన్ని (Pinni)";
+    if (!cell.cross && !male && cell.affinal) return "అత్తయ్య (Attayya)";
+    if (!cell.cross && male && !cell.affinal) return vsMother ? "పెద్దనాన్న (Peddananna)" : "బాబాయ్ (Babai)";
+    if (!cell.cross && male && cell.affinal) return vsMother ? "పెద్దనాన్న (Peddananna)" : "బాబాయ్ (Babai)";
+    if (cell.cross && male && !cell.affinal) return "మేనమామ / మామయ్య (Menamama)";
+    if (cell.cross && male && cell.affinal) return "మామయ్య (Mamayya)";
+    if (cell.cross && !male && !cell.affinal) return vsMother ? "పెద్దమ్మ (Peddamma)" : "మేనత్త / అత్తయ్య (Menattha)";
+    if (cell.cross && !male && cell.affinal) return "అత్తయ్య (Attayya)";
   }
 
-  if (pB.spouseId && pA.spouseId) {
-    const bSpouse = getMember(pB.spouseId);
-    const mySpouse = getMember(pA.spouseId);
-    if (bSpouse && mySpouse && areSiblings(mySpouse, bSpouse)) {
-      return { role: pB.gender === "female" ? "BROTHER_WIFE" : "SISTER_HUSBAND", isBio: false };
-    }
+  if (male) return cell.cross ? "మేనమామ / మామయ్య (Menamama)" : "బాబాయ్ (Babai)";
+  return cell.cross ? "మేనత్త / అత్తయ్య (Menattha)" : "పిన్ని (Pinni)";
+}
+
+function termGenMinus1(ego, alter, cell) {
+  const male = alter.gender === "male";
+  if (!cell.cross && !cell.affinal) return male ? "కొడుకు (Koduku)" : "కూతురు (Kooturu)";
+  if (!cell.cross && cell.affinal) return male ? "కొడుకు (Koduku)" : "కూతురు (Kooturu)";
+  if (cell.cross && cell.affinal) return male ? "అల్లుడు (Alludu)" : "కోడలు (Kodalu)";
+  return male ? "మేనల్లుడు (Menalludu)" : "మేనకోడలు (Menakodalu)";
+}
+
+function termFromMatrix(ego, alter, cell) {
+  if (!alter) return "";
+  if (!cell) {
+    return alter.gender === "male" ? "బాబాయ్ (Babai)" : "పిన్ని (Pinni)";
   }
 
-  const aSiblings = family.filter((m) => areSiblings(pA, m));
-  for (const sib of aSiblings) {
-    if (sib.spouseId === pB.id) {
-      return { role: pB.gender === "male" ? "SISTER_HUSBAND" : "BROTHER_WIFE", isBio: false };
-    }
+  if (cell.dist === 1 && cell.hop === "spouse") {
+    return alter.gender === "female" ? "భార్య (Bharya) [సొంత]" : "భర్త (Bhartha) [సొంత]";
+  }
+  if (cell.dist === 1 && cell.hop === "parent") {
+    return alter.gender === "male"
+      ? "తండ్రి / నాన్న (Tandri / Nanna) [సొంత]"
+      : "తల్లి / అమ్మ (Talli / Amma) [సొంత]";
+  }
+  if (cell.dist === 1 && cell.hop === "child") {
+    return alter.gender === "male" ? "కొడుకు (Koduku) [సొంత]" : "కూతురు (Kooturu) [సొంత]";
+  }
+  if (cell.dist === 1 && cell.hop === "sibling") {
+    const tag = " [సొంత]";
+    if (alter.gender === "male") return (isOlder(alter, ego) ? "అన్నయ్య (Annayya)" : "తమ్ముడు (Tammudu)") + tag;
+    return (isOlder(alter, ego) ? "అక్క (Akka)" : "చెల్లి (Chelli)") + tag;
   }
 
-  for (const sib of aSiblings) {
-    if (getAllParents(pB).some((p) => p.id === sib.id)) {
-      const isCross = (pA.gender === "male" && sib.gender === "female") || (pA.gender === "female" && sib.gender === "male");
-      return { role: isCross ? (pB.gender === "female" ? "MENAKODALU" : "MENALLUDU") : (pB.gender === "female" ? "DAUGHTER" : "SON"), isBio: false };
-    }
+  if (cell.minGen < 0 && cell.gen === 0) {
+    return alter.gender === "male" ? "వియ్యంకుడు (Viyyankudu)" : "వియ్యపురాలు (Viyyaralu)";
   }
 
-  const aChildren = family.filter((m) => getAllParents(m).some((p) => p.id === pA.id || (pA.spouseId && p.id === pA.spouseId)));
-  for (const ch of aChildren) {
-    if (ch.spouseId === pB.id) {
-      return { role: pB.gender === "male" ? "ALLUDU" : "KODALU", isBio: false };
-    }
-  }
+  const tag = bioTag(cell);
+  const g = cell.gen;
 
-  return null;
+  if (g >= 3) {
+    if (alter.gender === "male") return "తాతయ్య (Taatayya)" + tag;
+    return cell.line === "M" ? "అమ్మమ్మ (Ammamma)" + tag : "నానమ్మ (Nanamma)" + tag;
+  }
+  if (g === 2) {
+    if (alter.gender === "male") return "తాతయ్య (Taatayya)" + tag;
+    return cell.line === "M" ? "అమ్మమ్మ (Ammamma)" + tag : "నానమ్మ (Nanamma)" + tag;
+  }
+  if (g === 1) return termGenPlus1(ego, alter, cell);
+  if (g === 0) return termGen0(ego, alter, cell) + tag;
+  if (g === -1) return termGenMinus1(ego, alter, cell) + tag;
+  if (g === -2) {
+    if (cell.cross && cell.affinal) {
+      return alter.gender === "male" ? "మనమఅల్లుడు (Manama'alludu)" : "మనమకోడలు (Manamakodalu)";
+    }
+    return alter.gender === "male" ? "మనవడు (Manavadu)" : "మనవరాలు (Manavaralu)";
+  }
+  return alter.gender === "male" ? "మునిమనవడు (Munimanavadu)" : "మునిమనవరాలు (Munimanavaralu)";
 }
 
 function computeKinship(targetId) {
   if (targetId === focusPersonId) return "You (నేను)";
   if (kinshipCache.has(targetId)) return kinshipCache.get(targetId);
-  kinshipCache.set(targetId, "");
-  const result = computeKinshipUncached(targetId);
+  ensureKinshipIndex();
+  const ego = getMember(focusPersonId);
+  const alter = getMember(targetId);
+  const result = termFromMatrix(ego, alter, kinshipIndex.get(targetId));
   kinshipCache.set(targetId, result);
   return result;
-}
-
-function computeKinshipUncached(targetId) {
-  const focus = getMember(focusPersonId);
-  const target = getMember(targetId);
-  if (!focus || !target) return "";
-
-  const direct = getDirectKinshipRole(focus, target);
-  if (direct) return renderKinshipString(direct.role, direct.isBio, focus, target);
-
-  if (focus.spouseId) {
-    const spouse = getMember(focus.spouseId);
-    if (spouse) {
-      const relToSpouse = getDirectKinshipRole(spouse, target);
-      if (relToSpouse) {
-        const r = relToSpouse.role;
-        if (r === "FATHER") return "మామగారు (Mamagaru)";
-        if (r === "MOTHER") return "అత్తగారు / అత్త (Atthagaru)";
-        if (r === "PATERNAL_GRANDFATHER" || r === "MATERNAL_GRANDFATHER") return "తాతగారు / తాతయ్య (Taatayya)";
-        if (r === "MATERNAL_GRANDMOTHER") return "నానమ్మ (Nanamma)";
-        if (r === "PATERNAL_GRANDMOTHER") return "అమ్మమ్మ (Ammamma)";
-
-        if (focus.gender === "female") {
-          if (r === "BROTHER") return isOlder(target, spouse) ? "బావగారు (Bavagaru)" : "మరిది (Maridi)";
-          if (r === "SISTER") return isOlder(target, spouse) ? "వదిన (Vadina)" : "ఆడబిడ్డ (Aadabidda)";
-        } else {
-          if (r === "BROTHER") return isOlder(target, spouse) ? "బావగారు (Bavagaru)" : "బావమరిది (Bavamariidi)";
-          if (r === "SISTER") return isOlder(target, spouse) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
-        }
-
-        if (r === "SISTER_HUSBAND") return isOlder(target, spouse) ? "బావగారు (Bavagaru)" : "బావగారు / మరిది (Bavagaru / Maridi)";
-        if (r === "BROTHER_WIFE") return isOlder(target, spouse) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
-        if (r === "MENALLUDU") return "మేనల్లుడు (Menalludu)";
-        if (r === "MENAKODALU") return "మేనకోడలు (Menakodalu)";
-        if (r === "SON") return "కొడుకు (Koduku)";
-        if (r === "DAUGHTER") return "కూతురు (Kooturu)";
-
-        if (r === "CROSS_MALE_COUSIN") {
-          return isOlder(target, focus) ? "అన్నయ్య (Annayya)" : "తమ్ముడు (Tammudu)";
-        }
-        if (r === "CROSS_FEMALE_COUSIN") {
-          return isOlder(target, focus) ? "అక్క (Akka)" : "చెల్లి (Chelli)";
-        }
-      }
-    }
-  }
-
-  const mySiblings = family.filter((m) => areSiblings(focus, m));
-  for (const sib of mySiblings) {
-    if (sib.spouseId) {
-      const sibSpouse = getMember(sib.spouseId);
-      if (sibSpouse) {
-        if (sibSpouse.id === target.id) {
-          return isOlder(sibSpouse, focus) ? "బావ (Bava)" : "మరిది (Maridi)";
-        }
-        if (getAllParents(target).some((p) => p.id === sib.id || p.id === sibSpouse.id)) {
-          return target.gender === "male" ? "మేనల్లుడు (Menalludu)" : "మేనకోడలు (Menakodalu)";
-        }
-        const rArjun = getDirectKinshipRole(sibSpouse, target);
-        if (rArjun) {
-          const r = rArjun.role;
-          if (r === "FATHER") return "మామగారు (Mamagaru)";
-          if (r === "MOTHER") return "అత్తగారు (Attagaru)";
-          if (r === "BROTHER") return isOlder(target, focus) ? "బావ (Bava)" : "మరిది (Maridi)";
-          if (r === "SISTER") return isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
-          if (r === "PATERNAL_GRANDFATHER" || r === "MATERNAL_GRANDFATHER") return "తాతయ్య (Taatayya)";
-          if (r === "PATERNAL_GRANDMOTHER") return "నానమ్మ (Nanamma)";
-          if (r === "MATERNAL_GRANDMOTHER") return "అమ్మమ్మ (Ammamma)";
-        }
-
-        const arjunMother = getAllParents(sibSpouse).find((p) => p.gender === "female");
-        if (arjunMother) {
-          if (areSiblings(arjunMother, target) && target.gender === "male") return "బాబాయ్ (Babai)";
-          if (target.spouseId) {
-            const sp = getMember(target.spouseId);
-            if (sp && areSiblings(arjunMother, sp) && sp.gender === "male") return "పిన్ని (Pinni)";
-            if (sp && areSiblings(arjunMother, sp) && sp.gender === "female") return target.gender === "male" ? "మామయ్య (Mamayya)" : "అత్త (Atta)";
-          }
-          if (areSiblings(arjunMother, target) && target.gender === "female") {
-            return isOlder(target, arjunMother) ? "పెద్దమ్మ (Peddamma)" : "అత్తయ్య (Attayya)";
-          }
-
-          const targetParents = getAllParents(target);
-          for (const tp of targetParents) {
-            if (areSiblings(arjunMother, tp) && tp.gender === "male") {
-              return target.gender === "male"
-                ? (isOlder(target, focus) ? "అన్నయ్య (Annayya)" : "తమ్ముడు (Tammudu)")
-                : (isOlder(target, focus) ? "అక్క (Akka)" : "చెల్లి (Chelli)");
-            }
-            if (areSiblings(arjunMother, tp) && tp.gender === "female") {
-              return target.gender === "male"
-                ? (isOlder(target, focus) ? "బావ (Bava)" : "మరిది (Maridi)")
-                : (isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)");
-            }
-          }
-        }
-      }
-    }
-  }
-
-  if (target.spouseId) {
-    const tSpouse = getMember(target.spouseId);
-    if (tSpouse) {
-      const sRelStr = computeKinship(tSpouse.id);
-      if (sRelStr.includes("మేనల్లుడు") || sRelStr.includes("కొడుకు")) {
-        return target.gender === "female" ? "కోడలు (Kodalu)" : "అల్లుడు (Alludu)";
-      }
-      if (sRelStr.includes("మేనకోడలు") || sRelStr.includes("కూతురు")) {
-        return target.gender === "male" ? "అల్లుడు (Alludu)" : "కోడలు (Kodalu)";
-      }
-      if (sRelStr.includes("మనవడు")) return "మనమకోడలు (Manamakodalu)";
-      if (sRelStr.includes("మనవరాలు")) return "మనమఅల్లుడు (Manama'alludu)";
-      if (sRelStr.includes("బావగారు") || sRelStr.includes("బావ") || sRelStr.includes("మరిది") || sRelStr.includes("బావమరిది")) {
-        return target.gender === "female"
-          ? (isOlder(target, focus) ? "అక్క (Akka)" : "చెల్లి (Chelli)")
-          : (isOlder(target, focus) ? "అన్నయ్య (Annayya)" : "తమ్ముడు (Tammudu)");
-      }
-      if (sRelStr.includes("అన్నయ్య") || sRelStr.includes("తమ్ముడు") || sRelStr.includes("అక్క") || sRelStr.includes("చెల్లి")) {
-        return target.gender === "female"
-          ? (isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)")
-          : (isOlder(target, focus) ? "బావగారు (Bavagaru)" : "మరిది (Maridi)");
-      }
-    }
-  }
-
-  for (const p of getAllParents(target)) {
-    const pRelStr = computeKinship(p.id);
-    if (pRelStr.includes("కొడుకు") || pRelStr.includes("కూతురు") || pRelStr.includes("మేనల్లుడు") || pRelStr.includes("మేనకోడలు")) {
-      return target.gender === "male" ? "మనవడు (Manavadu)" : "మనవరాలు (Manavaralu)";
-    }
-    if (pRelStr.includes("మనవడు") || pRelStr.includes("మనవరాలు")) {
-      return target.gender === "male" ? "మునిమనవడు (Munimanavadu)" : "మునిమనవరాలు (Munimanavaralu)";
-    }
-  }
-
-  const allRelatives = family.filter((m) => m.id !== focus.id);
-  for (const rel of allRelatives) {
-    const relStr = computeKinship(rel.id);
-    if (relStr.includes("కోడలు") || relStr.includes("అల్లుడు") || relStr.includes("మనమకోడలు")) {
-      if (getAllParents(rel).some((p) => p.id === target.id)) {
-        return target.gender === "male" ? "వియ్యంకుడు (Viyyankudu)" : "వియ్యపురాలు (Viyyaralu)";
-      }
-      if (areSiblings(rel, target)) {
-        return target.gender === "female" ? "కోడలు వరుస (Kodalu)" : "అల్లుడు (Alludu)";
-      }
-    }
-    if (relStr.includes("ఆడబిడ్డ") || relStr.includes("బావగారు") || relStr.includes("మరిది")) {
-      if (getAllParents(rel).some((p) => p.id === target.id)) {
-        return target.gender === "male" ? "వియ్యంకుడు (Viyyankudu)" : "వియ్యపురాలు (Viyyaralu)";
-      }
-    }
-  }
-
-  const focusChildren = family.filter((m) => getAllParents(m).some((p) => p.id === focus.id || (focus.spouseId && p.id === focus.spouseId)));
-  for (const ch of focusChildren) {
-    if (ch.spouseId) {
-      const chSpouse = getMember(ch.spouseId);
-      if (chSpouse) {
-        if (getAllParents(chSpouse).some((p) => p.id === target.id)) {
-          return target.gender === "male" ? "వియ్యంకుడు (Viyyankudu)" : "వియ్యపురాలు (Viyyaralu)";
-        }
-        if (areSiblings(chSpouse, target) && target.gender === "female") return "కోడలు (Kodalu)";
-        const spouseSisters = family.filter((m) => areSiblings(chSpouse, m) && m.gender === "female");
-        if (spouseSisters.some((s) => s.spouseId === target.id)) return "కొడుకు (Koduku)";
-        if (areSiblings(chSpouse, target) && target.gender === "male") return "అల్లుడు (Alludu)";
-        const spouseBrothers = family.filter((m) => areSiblings(chSpouse, m) && m.gender === "male");
-        if (spouseBrothers.some((b) => b.spouseId === target.id)) return "కూతురు (Kooturu)";
-      }
-    }
-  }
-
-  return "చుట్టరికం (Relative)";
-}
-
-function renderKinshipString(role, isBio, focus, target) {
-  const tag = isBio ? " [సొంత]" : "";
-
-  if (role === "SPOUSE") return target.gender === "female" ? `భార్య (Bharya)${tag}` : `భర్త (Bhartha)${tag}`;
-  if (role === "FATHER") return `తండ్రి / నాన్న (Tandri / Nanna)${tag}`;
-  if (role === "MOTHER") return `తల్లి / అమ్మ (Talli / Amma)${tag}`;
-  if (role === "SON") return `కొడుకు (Koduku)${tag}`;
-  if (role === "DAUGHTER") return `కూతురు (Kooturu)${tag}`;
-  if (role === "BROTHER") return isOlder(target, focus) ? `అన్నయ్య (Annayya)${tag}` : `తమ్ముడు (Tammudu)${tag}`;
-  if (role === "SISTER") return isOlder(target, focus) ? `అక్క (Akka)${tag}` : `చెల్లి (Chelli)${tag}`;
-
-  if (role === "MAMAGARU") return "మామగారు (Mamagaru)";
-  if (role === "ATTAGARU") return "అత్తగారు / అత్త (Atthagaru)";
-  if (role === "KODALU") return "కోడలు (Kodalu)";
-  if (role === "ALLUDU") return "అల్లుడు (Alludu)";
-  if (role === "MENALLUDU") return "మేనల్లుడు (Menalludu)";
-  if (role === "MENAKODALU") return "మేనకోడలు (Menakodalu)";
-
-  if (role === "WIFE_BROTHER") return isOlder(target, focus) ? "బావ (Bava)" : "బావమరిది (Bavamariidi)";
-  if (role === "WIFE_SISTER") return isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
-  if (role === "HUSBAND_BROTHER") return isOlder(target, focus) ? "బావగారు (Bavagaru)" : "మరిది (Maridi)";
-  if (role === "HUSBAND_SISTER") return "ఆడబిడ్డ (Aadabidda)";
-
-  if (role === "BROTHER_WIFE") return isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
-  if (role === "SISTER_HUSBAND") return isOlder(target, focus) ? "బావగారు (Bavagaru)" : "బావ / మరిది (Bavagaru / Maridi)";
-
-  if (role === "PATERNAL_GRANDFATHER" || role === "MATERNAL_GRANDFATHER") return `తాతయ్య (Taatayya)${tag}`;
-  if (role === "PATERNAL_GRANDMOTHER") return `నానమ్మ (Nanamma)${tag}`;
-  if (role === "MATERNAL_GRANDMOTHER") return `అమ్మమ్మ (Ammamma)${tag}`;
-
-  if (role === "PEDDANANNA") return "పెద్దనాన్న (Peddananna)";
-  if (role === "BABAI") return "బాబాయ్ (Babai)";
-  if (role === "PEDDAMMA") return "పెద్దమ్మ (Peddamma)";
-  if (role === "PINNI") return "పిన్ని (Pinni)";
-  if (role === "MENATTHA") return "మేనత్త / అత్తయ్య (Menattha)";
-  if (role === "ATTAYYA") return "అత్తయ్య (Attayya)";
-  if (role === "MENAMAMA") return "మేనమామ / మామయ్య (Menamama)";
-  if (role === "MAMAYYA") return "మామయ్య (Mamayya)";
-
-  if (role === "CROSS_MALE_COUSIN") {
-    return focus.gender === "female"
-      ? (isOlder(target, focus) ? "బావగారు (Bavagaru)" : "మరిది (Maridi)")
-      : (isOlder(target, focus) ? "బావ (Bava)" : "బావమరిది (Bavamariidi)");
-  }
-  if (role === "CROSS_FEMALE_COUSIN") {
-    return focus.gender === "female"
-      ? (isOlder(target, focus) ? "వదిన (Vadina)" : "ఆడబిడ్డ (Aadabidda)")
-      : (isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)");
-  }
-
-  return "చుట్టరికం (Relative)";
 }
 
 function setFocusPerson(id) {
