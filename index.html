@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Family Tree v1.5.1</title>
+  <title>Family Tree v1.5.2</title>
   <link rel="stylesheet" href="style.css">
   <script src="d3.min.js" defer></script>
   <script src="script.js" defer></script>
@@ -21,7 +21,7 @@
         <div>
           <div class="app-name-row">
             <span class="app-name">Family Tree</span>
-            <span class="app-version" id="appVersion">v1.5.1</span>
+            <span class="app-version" id="appVersion">v1.5.2</span>
           </div>
           <div class="head-edit">
             <label class="micro-label" for="mainPersonInput">Family head</label>
@@ -91,12 +91,15 @@
     <div id="membersList" class="members-list"></div>
   </aside>
 
-  <div id="checkinBar" class="checkin-bar hidden">
-    <span>Who is opening the tree?</span>
-    <select id="checkinName"></select>
-    <input id="checkinOther" type="text" placeholder="Or type a name" autocomplete="off">
-    <button type="button" class="btn btn-primary btn-xs" onclick="submitCheckin()">I'm here</button>
-    <button type="button" class="btn btn-xs" onclick="skipCheckin()">Skip</button>
+  <div id="checkinOverlay" class="checkin-overlay hidden">
+    <div id="checkinBar" class="checkin-bar" role="dialog" aria-labelledby="checkinTitle">
+      <p id="checkinTitle" class="checkin-title">Who is opening the tree?</p>
+      <p class="muted">Pick your name, or type it if it is not in the list.</p>
+      <select id="checkinName" required></select>
+      <input id="checkinOther" type="text" placeholder="Type your name if not listed" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();submitCheckin();}">
+      <p id="checkinError" class="checkin-error hidden">Select a name or type one to continue.</p>
+      <button type="button" class="btn btn-primary" onclick="submitCheckin()">Continue</button>
+    </div>
   </div>
 
   <aside id="visitsDrawer" class="drawer drawer-narrow hidden">

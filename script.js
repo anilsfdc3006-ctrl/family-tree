@@ -1,4 +1,4 @@
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "1.5.2";
 const STORAGE_KEY = "telugu_family_tree_data_v31";
 const FOCUS_KEY = "telugu_family_tree_focus_v31";
 const OPENS_KEY = "telugu_family_tree_open_count";
@@ -461,42 +461,94 @@ async function trackOpen() {
   const total = Math.max(local, remote || 0);
   if (remote && remote > local) localStorage.setItem(OPENS_KEY, String(remote));
   setOpenCount(total);
-  const sessionKey = "telugu_family_tree_checked_in";
-  if (!sessionStorage.getItem(sessionKey)) {
-    sessionStorage.setItem(sessionKey, "1");
+  if (!sessionStorage.getItem("telugu_family_tree_who_session")) {
     showCheckin();
   }
   renderVisitsList(total);
 }
 
-function showCheckin() {
-  const box = document.getElementById("checkinBar");
+function loadKnownVisitorNames() {
+  const fromFamily = family.map((m) => m.name);
+  let extra = [];
+  try {
+    extra = JSON.parse(localStorage.getItem("telugu_family_tree_known_names") || "[]");
+  } catch (e) {
+    extra = [];
+  }
+  if (!Array.isArray(extra)) extra = [];
+  const fromVisits = loadLocalVisits().map((v) => v.name);
+  const seen = new Set();
+  const names = [];
+  [...fromFamily, ...extra, ...fromVisits].forEach((n) => {
+    const label = String(n || "").trim();
+    if (!label) return;
+    const key = label.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    names.push(label);
+  });
+  return names.sort((a, b) => a.localeCompare(b));
+}
+
+function rememberVisitorName(name) {
+  let extra = [];
+  try {
+    extra = JSON.parse(localStorage.getItem("telugu_family_tree_known_names") || "[]");
+  } catch (e) {
+    extra = [];
+  }
+  if (!Array.isArray(extra)) extra = [];
+  const key = name.toLowerCase();
+  const exists = extra.some((n) => String(n).toLowerCase() === key)
+    || family.some((m) => m.name.toLowerCase() === key);
+  if (!exists) extra.push(name);
+  localStorage.setItem("telugu_family_tree_known_names", JSON.stringify(extra));
+}
+
+function fillCheckinDropdown(selected) {
   const select = document.getElementById("checkinName");
-  if (!box || !select) return;
-  const names = family.map((m) => m.name).sort((a, b) => a.localeCompare(b));
-  select.innerHTML = `<option value="">Guest / skip</option>` + names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
-  const remembered = localStorage.getItem("telugu_family_tree_who");
-  if (remembered) select.value = remembered;
-  box.classList.remove("hidden");
+  if (!select) return;
+  const names = loadKnownVisitorNames();
+  select.innerHTML = `<option value="">Select your name</option>`
+    + names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  if (selected) {
+    const match = names.find((n) => n.toLowerCase() === selected.toLowerCase());
+    select.value = match || "";
+  }
+}
+
+function showCheckin() {
+  const overlay = document.getElementById("checkinOverlay");
+  const err = document.getElementById("checkinError");
+  const other = document.getElementById("checkinOther");
+  if (!overlay) return;
+  fillCheckinDropdown(localStorage.getItem("telugu_family_tree_who") || "");
+  if (other) other.value = "";
+  if (err) err.classList.add("hidden");
+  overlay.classList.remove("hidden");
 }
 
 function submitCheckin() {
   const select = document.getElementById("checkinName");
   const typed = (document.getElementById("checkinOther")?.value || "").trim();
-  const name = typed || (select && select.value) || "";
-  document.getElementById("checkinBar")?.classList.add("hidden");
-  if (!name) return;
+  const picked = (select && select.value || "").trim();
+  const name = typed || picked;
+  const err = document.getElementById("checkinError");
+  if (!name) {
+    if (err) err.classList.remove("hidden");
+    (typed ? document.getElementById("checkinOther") : select)?.focus();
+    return;
+  }
+  rememberVisitorName(name);
   localStorage.setItem("telugu_family_tree_who", name);
+  sessionStorage.setItem("telugu_family_tree_who_session", name);
   const visits = loadLocalVisits();
   visits.unshift({ name, at: Date.now() });
   saveLocalVisits(visits);
   persistLocalOnly();
   scheduleGithubSave();
+  document.getElementById("checkinOverlay")?.classList.add("hidden");
   renderVisitsList();
-}
-
-function skipCheckin() {
-  document.getElementById("checkinBar")?.classList.add("hidden");
 }
 
 function renderVisitsList(total) {
