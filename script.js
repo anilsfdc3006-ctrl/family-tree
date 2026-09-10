@@ -1,4 +1,4 @@
-const APP_VERSION = "1.5.5";
+const APP_VERSION = "1.5.6";
 const STORAGE_KEY = "telugu_family_tree_data_v31";
 const FOCUS_KEY = "telugu_family_tree_focus_v31";
 const OPENS_KEY = "telugu_family_tree_open_count";
@@ -832,6 +832,8 @@ function childrenFromRole(parentRole, child) {
     return male ? "SON" : "DAUGHTER";
   }
   if (["SISTER_E", "SISTER_Y", "SISTER_HUSBAND_E", "SISTER_HUSBAND_Y", "HUSB_SIS", "HUSB_BRO_E", "HUSB_BRO_Y"].includes(parentRole)) {
+    const ego = getMember(focusPersonId);
+    if (ego && ego.gender === "female") return male ? "SON" : "DAUGHTER";
     return male ? "MENALLUDU" : "MENAKODALU";
   }
   if (parentRole === "FATHER" || parentRole === "MOTHER") return siblingRoleByAge(child, getMember(focusPersonId));
@@ -968,7 +970,14 @@ function assignRoles(egoId) {
 function renderRole(role, ego, alter) {
   const tag = ["FATHER", "MOTHER", "SON", "DAUGHTER", "BROTHER_E", "BROTHER_Y", "SISTER_E", "SISTER_Y", "SPOUSE"].includes(role) && !alter?.id ? "" : "";
   const sonta = (r) => {
-    if (["FATHER", "MOTHER", "SON", "DAUGHTER"].includes(r)) return " [సొంత]";
+    if (r === "FATHER" || r === "MOTHER") {
+      return getAllParents(ego).some((p) => p.id === alter.id) ? " [సొంత]" : "";
+    }
+    if (r === "SON" || r === "DAUGHTER") {
+      const mine = childrenByParent.get(ego.id) || [];
+      const viaSpouse = ego.spouseId ? (childrenByParent.get(ego.spouseId) || []) : [];
+      return mine.concat(viaSpouse).some((c) => c.id === alter.id) ? " [సొంత]" : "";
+    }
     if (["BROTHER_E", "BROTHER_Y", "SISTER_E", "SISTER_Y"].includes(r)) {
       return (siblingIds.get(ego.id) || []).includes(alter.id) ? " [సొంత]" : "";
     }
