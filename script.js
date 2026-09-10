@@ -190,9 +190,14 @@ const areSiblings = (p1, p2) => {
   return p1Parents.some((id) => p2Parents.includes(id));
 };
 
-function getDirectKinshipRole(pA, pB) {
+function cousinRole(egoParent, linkingRelative, child) {
+  const parallel = egoParent.gender === linkingRelative.gender;
+  if (parallel) return child.gender === "male" ? "BROTHER" : "SISTER";
+  return child.gender === "male" ? "CROSS_MALE_COUSIN" : "CROSS_FEMALE_COUSIN";
+}
+
+function getBloodKinshipRole(pA, pB) {
   if (!pA || !pB || pA.id === pB.id) return null;
-  if (pA.spouseId === pB.id) return { role: "SPOUSE", isBio: true };
 
   const aParents = getAllParents(pA);
   const bParents = getAllParents(pB);
@@ -244,16 +249,39 @@ function getDirectKinshipRole(pA, pB) {
 
   for (const bp of bParents) {
     if (aFather && areSiblings(aFather, bp)) {
-      return {
-        role: bp.gender === "male" ? (pB.gender === "male" ? "BROTHER" : "SISTER") : (pB.gender === "male" ? "CROSS_MALE_COUSIN" : "CROSS_FEMALE_COUSIN"),
-        isBio: false
-      };
+      return { role: cousinRole(aFather, bp, pB), isBio: false };
     }
     if (aMother && areSiblings(aMother, bp)) {
-      return {
-        role: bp.gender === "female" ? (pB.gender === "male" ? "BROTHER" : "SISTER") : (pB.gender === "male" ? "CROSS_MALE_COUSIN" : "CROSS_FEMALE_COUSIN"),
-        isBio: false
-      };
+      return { role: cousinRole(aMother, bp, pB), isBio: false };
+    }
+  }
+
+  return null;
+}
+
+function isCrossCousinRole(role) {
+  return role === "CROSS_MALE_COUSIN" || role === "CROSS_FEMALE_COUSIN";
+}
+
+function isParallelSiblingRole(role) {
+  return role === "BROTHER" || role === "SISTER";
+}
+
+function getDirectKinshipRole(pA, pB) {
+  if (!pA || !pB || pA.id === pB.id) return null;
+  if (pA.spouseId === pB.id) return { role: "SPOUSE", isBio: true };
+
+  const blood = getBloodKinshipRole(pA, pB);
+  if (blood) return blood;
+
+  if (pB.spouseId) {
+    const bSpouse = getMember(pB.spouseId);
+    const spouseBlood = getBloodKinshipRole(pA, bSpouse);
+    if (spouseBlood && isCrossCousinRole(spouseBlood.role)) {
+      return { role: pB.gender === "male" ? "BROTHER" : "SISTER", isBio: false };
+    }
+    if (spouseBlood && isParallelSiblingRole(spouseBlood.role)) {
+      return { role: pB.gender === "male" ? "SISTER_HUSBAND" : "BROTHER_WIFE", isBio: false };
     }
   }
 
@@ -271,6 +299,43 @@ function getDirectKinshipRole(pA, pB) {
           isBio: false
         };
       }
+      const throughSpouse = getBloodKinshipRole(spouse, pB);
+      if (throughSpouse && isCrossCousinRole(throughSpouse.role)) {
+        return { role: pB.gender === "male" ? "BROTHER" : "SISTER", isBio: false };
+      }
+      if (throughSpouse && isParallelSiblingRole(throughSpouse.role)) {
+        return {
+          role: pA.gender === "male"
+            ? (pB.gender === "male" ? "WIFE_BROTHER" : "WIFE_SISTER")
+            : (pB.gender === "male" ? "HUSBAND_BROTHER" : "HUSBAND_SISTER"),
+          isBio: false
+        };
+      }
+    }
+  }
+
+  const bParentsNow = getAllParents(pB);
+  for (const bp of bParentsNow) {
+    const parentBlood = getBloodKinshipRole(pA, bp);
+    if (parentBlood && isCrossCousinRole(parentBlood.role)) {
+      return { role: pB.gender === "female" ? "MENAKODALU" : "MENALLUDU", isBio: false };
+    }
+    if (parentBlood && isParallelSiblingRole(parentBlood.role) && !parentBlood.isBio) {
+      return { role: pB.gender === "female" ? "DAUGHTER" : "SON", isBio: false };
+    }
+    if (bp.spouseId) {
+      const parentSpouseBlood = getBloodKinshipRole(pA, getMember(bp.spouseId));
+      if (parentSpouseBlood && isCrossCousinRole(parentSpouseBlood.role)) {
+        return { role: pB.gender === "female" ? "MENAKODALU" : "MENALLUDU", isBio: false };
+      }
+    }
+  }
+
+  if (pB.spouseId && pA.spouseId) {
+    const bSpouse = getMember(pB.spouseId);
+    const mySpouse = getMember(pA.spouseId);
+    if (bSpouse && mySpouse && areSiblings(mySpouse, bSpouse)) {
+      return { role: pB.gender === "female" ? "BROTHER_WIFE" : "SISTER_HUSBAND", isBio: false };
     }
   }
 
@@ -343,14 +408,10 @@ function computeKinshipUncached(targetId) {
         if (r === "DAUGHTER") return "కూతురు (Kooturu)";
 
         if (r === "CROSS_MALE_COUSIN") {
-          return focus.gender === "female"
-            ? (isOlder(target, spouse) ? "బావగారు (Bavagaru)" : "మరిది (Maridi)")
-            : (isOlder(target, spouse) ? "బావ (Bava)" : "బావమరిది (Bavamariidi)");
+          return isOlder(target, focus) ? "అన్నయ్య (Annayya)" : "తమ్ముడు (Tammudu)";
         }
         if (r === "CROSS_FEMALE_COUSIN") {
-          return focus.gender === "female"
-            ? (isOlder(target, spouse) ? "వదిన (Vadina)" : "ఆడబిడ్డ (Aadabidda)")
-            : (isOlder(target, spouse) ? "వదిన (Vadina)" : "మరదలు (Maradalu)");
+          return isOlder(target, focus) ? "అక్క (Akka)" : "చెల్లి (Chelli)";
         }
       }
     }
@@ -421,7 +482,16 @@ function computeKinshipUncached(targetId) {
       }
       if (sRelStr.includes("మనవడు")) return "మనమకోడలు (Manamakodalu)";
       if (sRelStr.includes("మనవరాలు")) return "మనమఅల్లుడు (Manama'alludu)";
-      if (sRelStr.includes("బావగారు") || sRelStr.includes("బావ")) return isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)";
+      if (sRelStr.includes("బావగారు") || sRelStr.includes("బావ") || sRelStr.includes("మరిది") || sRelStr.includes("బావమరిది")) {
+        return target.gender === "female"
+          ? (isOlder(target, focus) ? "అక్క (Akka)" : "చెల్లి (Chelli)")
+          : (isOlder(target, focus) ? "అన్నయ్య (Annayya)" : "తమ్ముడు (Tammudu)");
+      }
+      if (sRelStr.includes("అన్నయ్య") || sRelStr.includes("తమ్ముడు") || sRelStr.includes("అక్క") || sRelStr.includes("చెల్లి")) {
+        return target.gender === "female"
+          ? (isOlder(target, focus) ? "వదిన (Vadina)" : "మరదలు (Maradalu)")
+          : (isOlder(target, focus) ? "బావగారు (Bavagaru)" : "మరిది (Maridi)");
+      }
     }
   }
 
