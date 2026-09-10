@@ -49,14 +49,18 @@
           <button type="button" class="btn btn-primary btn-xs" onclick="saveMainPersonName(true)">Save</button>
         </div>
       </div>
-      <button type="button" class="btn" onclick="exportFamilyJson()">Export</button>
+      <p id="saveStatus" class="save-status">Not saved yet</p>
+      <button type="button" class="btn btn-primary" onclick="saveToWebsite()">Save to website</button>
+      <button type="button" class="btn" onclick="toggleSettingsPanel()">Save settings</button>
+      <button type="button" class="btn" onclick="exportFamilyJson()">Download backup</button>
       <label class="btn file-btn">
-        Import
+        Load backup
         <input type="file" accept=".json" onchange="importFamilyJson(event)">
       </label>
+      <button type="button" class="btn" onclick="toggleVisitsPanel()">Visitors</button>
       <button type="button" class="btn" onclick="toggleEventsPanel()">Events</button>
       <button type="button" class="btn" onclick="resetZoom()">Fit view</button>
-      <button type="button" class="btn btn-danger" onclick="clearStorageAndReset()">Reset</button>
+      <button type="button" class="btn btn-danger" onclick="clearStorageAndReset()">Reset this device</button>
     </div>
   </header>
 
@@ -71,13 +75,33 @@
     <div class="drawer-head">
       <div>
         <h2>Family members</h2>
-        <p class="muted"><span id="memberCount">0</span> people</p>
+        <p class="muted"><span id="memberCount">0</span> people · <span id="saveStatusShort">saved on this device</span></p>
       </div>
       <button type="button" class="icon-btn" onclick="toggleMembersPanel()" aria-label="Close">✕</button>
     </div>
     <input id="memberFilter" type="search" placeholder="Filter names…" autocomplete="off" oninput="updateMembersList()">
     <div id="focusActions" class="focus-actions"></div>
     <div id="membersList" class="members-list"></div>
+  </aside>
+
+  <div id="checkinBar" class="checkin-bar hidden">
+    <span>Who is opening the tree?</span>
+    <select id="checkinName"></select>
+    <input id="checkinOther" type="text" placeholder="Or type a name" autocomplete="off">
+    <button type="button" class="btn btn-primary btn-xs" onclick="submitCheckin()">I'm here</button>
+    <button type="button" class="btn btn-xs" onclick="skipCheckin()">Skip</button>
+  </div>
+
+  <aside id="visitsDrawer" class="drawer drawer-narrow hidden">
+    <div class="drawer-head">
+      <div>
+        <h2>Visitors</h2>
+        <p class="muted">Opened <strong id="openCount">—</strong> times</p>
+      </div>
+      <button type="button" class="icon-btn" onclick="toggleVisitsPanel()" aria-label="Close">✕</button>
+    </div>
+    <p class="muted" style="padding: 0 12px;">Total opens are counted for everyone. Names appear when someone checks in. Website save publishes this list with the tree.</p>
+    <div id="visitsList" class="events-list"></div>
   </aside>
 
   <aside id="eventsDrawer" class="drawer drawer-narrow hidden">
@@ -87,6 +111,27 @@
     </div>
     <div id="eventsList" class="events-list"></div>
   </aside>
+
+  <div id="settingsModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button type="button" class="modal-close" onclick="closeModal('settingsModal')">✕</button>
+      <h3>Keep data on the website</h3>
+      <p class="muted">Adds and edits are always saved on this phone or computer. To keep the same tree on every device, save it to GitHub (the hosted site).</p>
+      <label class="field">
+        <span>GitHub repository</span>
+        <input type="text" id="githubRepo" placeholder="owner/repo" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>GitHub token (stays on this device)</span>
+        <input type="password" id="githubToken" placeholder="ghp_…" autocomplete="off">
+      </label>
+      <p class="muted">Create a token with access to this repo: GitHub → Settings → Developer settings → Personal access tokens. You only paste it here; it is not uploaded in the family JSON.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" onclick="closeModal('settingsModal')">Close</button>
+        <button type="button" class="btn btn-primary" onclick="saveGithubSettings()">Save settings &amp; publish</button>
+      </div>
+    </div>
+  </div>
 
   <div id="addModal" class="modal-overlay hidden">
     <div class="modal">

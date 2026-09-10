@@ -1,5 +1,9 @@
 const STORAGE_KEY = "telugu_family_tree_data_v31";
 const FOCUS_KEY = "telugu_family_tree_focus_v31";
+const TOKEN_KEY = "telugu_family_tree_github_token";
+const REPO_KEY = "telugu_family_tree_github_repo";
+const IDB_NAME = "telugu_family_tree_db";
+const IDB_STORE = "kv";
 
 const MALE_ICON = `<svg viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>`;
 const FEMALE_ICON = `<svg viewBox="0 0 24 24"><path d="M12 2a4.5 4.5 0 0 0-4.5 4.5c0 1.9 1.2 3.5 2.8 4.2C7 11.5 4 14.2 4 18v2h16v-2c0-3.8-3-6.5-6.3-7.3 1.6-.7 2.8-2.3 2.8-4.2A4.5 4.5 0 0 0 12 2zm0 2c1.4 0 2.5 1.1 2.5 2.5S13.4 9 12 9s-2.5-1.1-2.5-2.5S10.6 4 12 4z"/></svg>`;
@@ -42,6 +46,9 @@ let siblingIds = new Map();
 let kinshipIndex = null;
 let lastLayout = null;
 let viewport, svg, container, nodesLayer, zoom;
+let lastSavedAt = 0;
+let githubSaveTimer = null;
+let saveInFlight = false;
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
@@ -87,6 +94,148 @@ function looksLikeMinimalFallback(arr) {
   return ids === "1,2";
 }
 
+function cloneMembers(list) {
+  return (list || []).map((m) => ({ ...m, parentIds: [...(m.parentIds || [])] }));
+}
+
+function parseRecord(raw) {
+  if (!raw) return null;
+  if (typeof raw === "string") {
+    try { raw = JSON.parse(raw); } catch (e) { return null; }
+  }
+  if (Array.isArray(raw) && raw.length > 0 && !looksLikeMinimalFallback(raw)) {
+    return { savedAt: 0, family: raw, focusPersonId: null, visits: [] };
+  }
+  if (raw && Array.isArray(raw.family) && raw.family.length > 0) {
+    return {
+      savedAt: Number(raw.savedAt) || 0,
+      family: raw.family,
+      focusPersonId: raw.focusPersonId || null,
+      visits: Array.isArray(raw.visits) ? raw.visits : []
+    };
+  }
+  return null;
+}
+
+function makeRecord() {
+  return {
+    savedAt: lastSavedAt || Date.now(),
+    focusPersonId,
+    family,
+    visits: loadLocalVisits()
+  };
+}
+
+function applyRecord(record) {
+  family = cloneMembers(record.family);
+  rebuildIndexes();
+  if (record.focusPersonId && getMember(record.focusPersonId)) {
+    focusPersonId = record.focusPersonId;
+  }
+  if (record.visits && record.visits.length) mergeRemoteVisits(record.visits);
+}
+
+function inferRepo() {
+  const stored = localStorage.getItem(REPO_KEY);
+  if (stored && stored.includes("/")) return stored;
+  const host = location.hostname || "";
+  const m = host.match(/^([^.]+)\.github\.io$/i);
+  if (m) {
+    const parts = location.pathname.split("/").filter(Boolean);
+    return `${m[1]}/${parts[0] || (m[1] + ".github.io")}`;
+  }
+  return "anilsfdc3006-ctrl/family-tree";
+}
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) return resolve(null);
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function idbSet(key, value) {
+  const db = await idbOpen();
+  if (!db) return;
+  await new Promise((resolve) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    tx.objectStore(IDB_STORE).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+
+async function idbGet(key) {
+  const db = await idbOpen();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    const tx = db.transaction(IDB_STORE, "readonly");
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => resolve(null);
+  });
+}
+
+function setSaveStatus(text, kind) {
+  const el = document.getElementById("saveStatus");
+  const short = document.getElementById("saveStatusShort");
+  if (el) {
+    el.textContent = text;
+    el.className = "save-status" + (kind ? " " + kind : "");
+  }
+  if (short) short.textContent = text;
+}
+
+function persistLocalOnly() {
+  lastSavedAt = Date.now();
+  const record = makeRecord();
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(record));
+    localStorage.setItem(FOCUS_KEY, focusPersonId || "");
+    setSaveStatus("Saved on this device", "ok");
+  } catch (e) {
+    setSaveStatus("Device storage is full — download a backup", "err");
+  }
+  idbSet("record", record);
+}
+
+function persistFamilyData() {
+  persistLocalOnly();
+  scheduleGithubSave();
+}
+
+function scheduleGithubSave() {
+  if (!localStorage.getItem(TOKEN_KEY)) return;
+  clearTimeout(githubSaveTimer);
+  githubSaveTimer = setTimeout(() => saveToWebsite(true), 1800);
+}
+
+async function fetchRemoteRecord() {
+  const repo = inferRepo();
+  try {
+    const api = await fetch(`https://api.github.com/repos/${repo}/contents/family_data.json?ref=main`, {
+      cache: "no-store",
+      headers: { Accept: "application/vnd.github+json" }
+    });
+    if (api.ok) {
+      const json = await api.json();
+      if (json.content) {
+        const text = decodeURIComponent(escape(atob(String(json.content).replace(/\n/g, ""))));
+        const parsed = parseRecord(text);
+        if (parsed) return parsed;
+      }
+    }
+  } catch (e) { /* public API may be rate-limited */ }
+  try {
+    const res = await fetch("family_data.json?t=" + Date.now(), { cache: "no-store" });
+    if (res.ok) return parseRecord(await res.json());
+  } catch (e) { /* offline */ }
+  return null;
+}
+
 async function initializeApp() {
   if (typeof d3 === "undefined") {
     const screen = document.getElementById("loadingScreen");
@@ -95,49 +244,40 @@ async function initializeApp() {
   }
 
   setupCanvas();
+  fillGithubSettingsForm();
 
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0 && !looksLikeMinimalFallback(parsed)) {
-        family = parsed;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }
+  let local = parseRecord(localStorage.getItem(STORAGE_KEY));
+  if (!local) local = parseRecord(await idbGet("record"));
+  const remote = await fetchRemoteRecord();
 
-  if (family.length === 0) {
-    family = DEFAULT_FAMILY.map((m) => ({ ...m, parentIds: [...(m.parentIds || [])] }));
-    try {
-      const res = await fetch("family_data.json", { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > family.length) {
-          family = data;
-        }
-      }
-    } catch (e) {
-      // Embedded default is enough when opened as a file or offline.
-    }
-  }
+  const candidates = [local, remote].filter(Boolean);
+  candidates.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0) || b.family.length - a.family.length);
+  const chosen = candidates[0];
 
-  rebuildIndexes();
-
-  const savedFocus = localStorage.getItem(FOCUS_KEY);
-  if (savedFocus && getMember(savedFocus)) {
-    focusPersonId = savedFocus;
+  if (chosen) {
+    applyRecord(chosen);
+    lastSavedAt = chosen.savedAt || Date.now();
   } else {
-    const arjun = family.find((m) => m.name.toLowerCase() === "arjun");
-    focusPersonId = arjun ? arjun.id : (family[0]?.id || "1");
+    family = cloneMembers(DEFAULT_FAMILY);
+    rebuildIndexes();
   }
 
-  persistFamilyData();
+  if (!focusPersonId || !getMember(focusPersonId)) {
+    const savedFocus = localStorage.getItem(FOCUS_KEY);
+    const arjun = family.find((m) => m.name.toLowerCase() === "arjun");
+    focusPersonId = (savedFocus && getMember(savedFocus) && savedFocus) || (arjun ? arjun.id : (family[0]?.id || "1"));
+  }
+
+  persistLocalOnly();
+  if (local && remote && (local.savedAt || 0) > (remote.savedAt || 0) && localStorage.getItem(TOKEN_KEY)) {
+    scheduleGithubSave();
+  }
+
   updateHeaderInputs();
   renderTree();
   requestAnimationFrame(() => resetZoom(false));
   hideLoading();
+  trackOpen();
 }
 
 function hideLoading() {
@@ -145,13 +285,8 @@ function hideLoading() {
   if (screen) screen.classList.add("hidden");
 }
 
-function persistFamilyData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(family));
-  localStorage.setItem(FOCUS_KEY, focusPersonId);
-}
-
 function exportFamilyJson() {
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(family, null, 2));
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(makeRecord(), null, 2));
   const downloadAnchor = document.createElement("a");
   downloadAnchor.setAttribute("href", dataStr);
   downloadAnchor.setAttribute("download", "family_tree_backup.json");
@@ -167,23 +302,188 @@ function importFamilyJson(event) {
   const reader = new FileReader();
   reader.onload = function (e) {
     try {
-      const imported = JSON.parse(e.target.result);
-      if (Array.isArray(imported) && imported.length > 0) {
-        family = imported;
-        rebuildIndexes();
-        focusPersonId = family[0].id;
-        persistFamilyData();
-        renderTree();
-        updateHeaderInputs();
-        resetZoom();
-        alert(`Loaded ${family.length} relatives successfully!`);
+      const record = parseRecord(e.target.result);
+      if (!record) {
+        alert("Invalid JSON file.");
+        return;
       }
+      applyRecord(record);
+      if (!focusPersonId) focusPersonId = family[0].id;
+      persistFamilyData();
+      renderTree();
+      updateHeaderInputs();
+      resetZoom();
+      alert(`Loaded ${family.length} relatives successfully!`);
     } catch (err) {
       alert("Invalid JSON file.");
     }
   };
   reader.readAsText(file);
   event.target.value = "";
+}
+
+function fillGithubSettingsForm() {
+  const repo = document.getElementById("githubRepo");
+  const token = document.getElementById("githubToken");
+  if (repo) repo.value = inferRepo();
+  if (token) token.value = localStorage.getItem(TOKEN_KEY) || "";
+}
+
+function toggleSettingsPanel() {
+  fillGithubSettingsForm();
+  document.getElementById("settingsModal").classList.toggle("hidden");
+}
+
+function saveGithubSettings() {
+  const repo = (document.getElementById("githubRepo").value || "").trim();
+  const token = (document.getElementById("githubToken").value || "").trim();
+  if (repo) localStorage.setItem(REPO_KEY, repo);
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+  closeModal("settingsModal");
+  saveToWebsite(false);
+}
+
+async function saveToWebsite(silent) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    if (!silent) toggleSettingsPanel();
+    else setSaveStatus("Saved on this device only", "warn");
+    return;
+  }
+  if (saveInFlight) return;
+  saveInFlight = true;
+  setSaveStatus("Saving to website…", "warn");
+  const repo = inferRepo();
+  const bodyText = JSON.stringify(makeRecord(), null, 2);
+  try {
+    const metaRes = await fetch(`https://api.github.com/repos/${repo}/contents/family_data.json`, {
+      headers: { Authorization: "Bearer " + token, Accept: "application/vnd.github+json" }
+    });
+    const meta = metaRes.ok ? await metaRes.json() : {};
+    const putRes = await fetch(`https://api.github.com/repos/${repo}/contents/family_data.json`, {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer " + token,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: "Update family tree data",
+        content: btoa(unescape(encodeURIComponent(bodyText))),
+        sha: meta.sha
+      })
+    });
+    if (!putRes.ok) {
+      const err = await putRes.json().catch(() => ({}));
+      throw new Error(err.message || ("GitHub " + putRes.status));
+    }
+    setSaveStatus("Saved to website", "ok");
+  } catch (e) {
+    setSaveStatus("Website save failed — still on this device. " + (e.message || ""), "err");
+    if (!silent) alert("Could not save to the website. Data is still kept on this device.\n\n" + (e.message || e));
+  } finally {
+    saveInFlight = false;
+  }
+}
+
+function loadLocalVisits() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem("telugu_family_tree_visits") || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveLocalVisits(list) {
+  localStorage.setItem("telugu_family_tree_visits", JSON.stringify(list.slice(0, 300)));
+}
+
+function mergeRemoteVisits(remote) {
+  const local = loadLocalVisits();
+  const key = (v) => `${v.name}|${v.at}`;
+  const map = new Map();
+  [...remote, ...local].forEach((v) => {
+    if (v && v.name && v.at) map.set(key(v), v);
+  });
+  const merged = Array.from(map.values()).sort((a, b) => b.at - a.at);
+  saveLocalVisits(merged);
+}
+
+async function trackOpen() {
+  let total = null;
+  try {
+    const res = await fetch("https://api.counterapi.dev/v1/anilsfdc-family-tree/opens/up", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      total = data.count ?? data.value ?? null;
+    }
+  } catch (e) { /* counter API optional */ }
+  const opensEl = document.getElementById("openCount");
+  if (opensEl && total != null) opensEl.textContent = String(total);
+  const sessionKey = "telugu_family_tree_checked_in";
+  if (!sessionStorage.getItem(sessionKey)) {
+    sessionStorage.setItem(sessionKey, "1");
+    showCheckin();
+  }
+  renderVisitsList(total);
+}
+
+function showCheckin() {
+  const box = document.getElementById("checkinBar");
+  const select = document.getElementById("checkinName");
+  if (!box || !select) return;
+  const names = family.map((m) => m.name).sort((a, b) => a.localeCompare(b));
+  select.innerHTML = `<option value="">Guest / skip</option>` + names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  const remembered = localStorage.getItem("telugu_family_tree_who");
+  if (remembered) select.value = remembered;
+  box.classList.remove("hidden");
+}
+
+function submitCheckin() {
+  const select = document.getElementById("checkinName");
+  const typed = (document.getElementById("checkinOther")?.value || "").trim();
+  const name = typed || (select && select.value) || "";
+  document.getElementById("checkinBar")?.classList.add("hidden");
+  if (!name) return;
+  localStorage.setItem("telugu_family_tree_who", name);
+  const visits = loadLocalVisits();
+  visits.unshift({ name, at: Date.now() });
+  saveLocalVisits(visits);
+  persistLocalOnly();
+  scheduleGithubSave();
+  renderVisitsList();
+}
+
+function skipCheckin() {
+  document.getElementById("checkinBar")?.classList.add("hidden");
+}
+
+function renderVisitsList(total) {
+  const el = document.getElementById("visitsList");
+  const countEl = document.getElementById("openCount");
+  if (countEl && total != null) countEl.textContent = String(total);
+  if (!el) return;
+  const visits = loadLocalVisits();
+  const byName = new Map();
+  visits.forEach((v) => {
+    const cur = byName.get(v.name) || { name: v.name, times: 0, last: 0 };
+    cur.times += 1;
+    cur.last = Math.max(cur.last, v.at);
+    byName.set(v.name, cur);
+  });
+  const rows = Array.from(byName.values()).sort((a, b) => b.last - a.last);
+  el.innerHTML = rows.length
+    ? rows.map((r) => `<div class="event-item"><strong>${escapeHtml(r.name)}</strong> · ${r.times} open${r.times === 1 ? "" : "s"} · last ${new Date(r.last).toLocaleString()}</div>`).join("")
+    : `<p class="muted">No named check-ins yet. Opens are still counted.</p>`;
+}
+
+function toggleVisitsPanel() {
+  document.getElementById("membersDrawer").classList.add("hidden");
+  document.getElementById("eventsDrawer").classList.add("hidden");
+  document.getElementById("visitsDrawer").classList.toggle("hidden");
+  renderVisitsList();
 }
 
 const isOlder = (p1, p2) => {
@@ -468,7 +768,7 @@ function deleteMember(id) {
 }
 
 function clearStorageAndReset() {
-  if (confirm("Reset tree to default members?")) {
+  if (confirm("Reset this device to the website copy? Adds made only on this phone/computer will be lost.")) {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(FOCUS_KEY);
     family = [];
@@ -992,11 +1292,13 @@ function resetZoom(animate = true) {
 
 function toggleEventsPanel() {
   document.getElementById("membersDrawer").classList.add("hidden");
+  document.getElementById("visitsDrawer")?.classList.add("hidden");
   document.getElementById("eventsDrawer").classList.toggle("hidden");
 }
 
 function toggleMembersPanel() {
   document.getElementById("eventsDrawer").classList.add("hidden");
+  document.getElementById("visitsDrawer")?.classList.add("hidden");
   document.getElementById("membersDrawer").classList.toggle("hidden");
   updateMembersList();
   updateFocusActions();
@@ -1008,4 +1310,8 @@ function toggleHeaderMenu() {
 
 window.addEventListener("DOMContentLoaded", () => {
   initializeApp();
+});
+
+window.addEventListener("beforeunload", () => {
+  if (family.length) persistLocalOnly();
 });

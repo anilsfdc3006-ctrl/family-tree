@@ -284,6 +284,50 @@ html, body {
 
 .muted { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
 
+.save-status {
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: #a5b4fc;
+}
+
+.save-status.ok { color: #86efac; }
+.save-status.warn { color: #fcd34d; }
+.save-status.err { color: #fda4af; }
+
+.checkin-bar {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(16px + var(--safe-bottom));
+  z-index: 35;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(30, 41, 59, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+}
+
+.checkin-bar select,
+.checkin-bar input {
+  background: #0f172a;
+  border: 1px solid var(--border);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 16px;
+}
+
+@media (max-width: 767px) {
+  .checkin-bar { bottom: calc(76px + var(--safe-bottom)); }
+}
+
 .focus-actions {
   padding: 0 12px 10px;
   border-bottom: 1px solid var(--border);
