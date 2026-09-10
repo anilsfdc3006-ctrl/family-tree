@@ -1,4 +1,4 @@
-const APP_VERSION = "1.5.2";
+const APP_VERSION = "1.5.3";
 const STORAGE_KEY = "telugu_family_tree_data_v31";
 const FOCUS_KEY = "telugu_family_tree_focus_v31";
 const OPENS_KEY = "telugu_family_tree_open_count";
@@ -696,7 +696,11 @@ function bioTag(cell) {
 
 function termGen0(ego, alter, cell) {
   const male = alter.gender === "male";
-  const older = isOlder(alter, ego);
+  let older = isOlder(alter, ego);
+  if (cell.affinal && cell.cross && alter.spouseId) {
+    const blood = getMember(alter.spouseId);
+    if (blood) older = isOlder(blood, ego);
+  }
   const femaleEgo = ego.gender === "female";
   if (!cell.cross) {
     if (male) return older ? "అన్నయ్య (Annayya)" : "తమ్ముడు (Tammudu)";
